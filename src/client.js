@@ -1,5 +1,6 @@
 import { StateField, EditorState } from "@codemirror/state";
 import { listen } from "vscode-ws-jsonrpc";
+import ReconnectingWebSocket from "reconnecting-websocket";
 import * as packageJson from "../package.json";
 import { mergePublishDiagnosticsClientCapabilities } from "./publishDiagnosticsClientCapabilities";
 import {
@@ -31,20 +32,37 @@ export function createInitializeParams(state) {
  * Create a connection to a remote language server, in which the handshake has been finished.
  * @param {EditorState} state
  * @param {InitializeParams} params
- * @returns {Promise<InitializeResult & {connection: MessageConnection}>}
+ * @param {ReconnectingWebSocket} [webSocket]
+ * @returns {{
+ *  params: InitializeParams,
+ *  webSocket: ReconnectingWebSocket,
+ *  ready: boolean,
+ *  promise: Promise<{
+ *  result: InitializeResult,
+ *  connection: MessageConnection,
+ * }>}}
  */
-export function createConnection(state, params) {
-  const uri = state.facet(serverUri, false);
-  // TODO: reconnect if the connection lost
-  const webSocket = new WebSocket(uri);
-  return new Promise((onConnection) => {
-    listen({ webSocket, onConnection });
-  }).then(async (connection) => {
-    connection.listen();
-    const response = await connection.sendRequest("initialize", params);
-    await connection.sendNotification("initialized");
-    return { ...response, connection };
-  });
+export function createConnection(state, params, webSocket) {
+  webSocket =
+    webSocket || new ReconnectingWebSocket(state.facet(serverUri, false));
+  const value = {
+    params,
+    webSocket,
+    ready: false,
+    promise: new Promise((resolve) => {
+      listen({
+        webSocket,
+        onConnection: async (connection) => {
+          connection.listen();
+          const result = await connection.sendRequest("initialize", params);
+          await connection.sendNotification("initialized");
+          resolve({ result, connection });
+          value.ready = true;
+        },
+      });
+    }),
+  };
+  return value;
 }
 
 export const client = StateField.define({
@@ -52,8 +70,10 @@ export const client = StateField.define({
     const params = createInitializeParams(state);
     return createConnection(state, params);
   },
-  update(value) {
-    return value;
+  update(value, tr) {
+    return value.ready && value.webSocket.readyState == value.webSocket.CLOSED
+      ? createConnection(tr.state, value.params, value.webSocket)
+      : value;
   },
 });
 
