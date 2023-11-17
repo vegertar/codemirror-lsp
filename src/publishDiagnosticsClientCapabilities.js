@@ -1,7 +1,15 @@
-import { Facet } from "@codemirror/state";
+import { Facet, EditorState } from "@codemirror/state";
+import {
+  PublishDiagnosticsClientCapabilities,
+  InitializeParams,
+} from "vscode-languageserver-protocol";
 import merge from "lodash.merge";
 import { firstAvailable } from "./utils";
 
+/**
+ * The extension to declare PublishDiagnosticsClientCapabilities.
+ *  @type {Facet<PublishDiagnosticsClientCapabilities, PublishDiagnosticsClientCapabilities>}
+ */
 export const publishDiagnosticsClientCapabilities = Facet.define({
   combine: (values) =>
     values.length
@@ -17,13 +25,22 @@ export const publishDiagnosticsClientCapabilities = Facet.define({
       : null,
 });
 
-export function mergePublishDiagnosticsClientCapabilities(state, config) {
+/**
+ * Merge the PublishDiagnosticsClientCapabilities into the provided InitializeParams.
+ * @param {EditorState} state
+ * @param {InitializeParams} initializeParams
+ * @returns {InitializeParams}
+ */
+export function mergePublishDiagnosticsClientCapabilities(
+  state,
+  initializeParams
+) {
   const publishDiagnostics = state.facet(
     publishDiagnosticsClientCapabilities,
     false
   );
 
-  return merge(config, {
+  return merge(initializeParams, {
     capabilities: {
       textDocument: {
         publishDiagnostics,
