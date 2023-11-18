@@ -3,6 +3,7 @@ import { EditorState } from "@codemirror/state";
 
 import client from "./client";
 import publishDiagnosticsClientCapabilities from "./publishDiagnosticsClientCapabilities";
+import trace from "./trace";
 
 new EditorView({
   extensions: [
@@ -10,6 +11,7 @@ new EditorView({
     EditorState.readOnly.of(true),
     client,
     publishDiagnosticsClientCapabilities.of(),
+    trace.of("verbose"),
   ],
   parent: document.body,
 });

@@ -29,7 +29,7 @@ export const publishDiagnosticsClientCapabilities = Facet.define({
  * Merge the PublishDiagnosticsClientCapabilities into the provided InitializeParams.
  * @param {EditorState} state
  * @param {InitializeParams} initializeParams
- * @returns {InitializeParams}
+ * @returns {void}
  */
 export function mergePublishDiagnosticsClientCapabilities(
   state,
@@ -40,13 +40,14 @@ export function mergePublishDiagnosticsClientCapabilities(
     false
   );
 
-  return merge(initializeParams, {
-    capabilities: {
-      textDocument: {
-        publishDiagnostics,
+  publishDiagnostics &&
+    merge(initializeParams, {
+      capabilities: {
+        textDocument: {
+          publishDiagnostics,
+        },
       },
-    },
-  });
+    });
 }
 
 export default publishDiagnosticsClientCapabilities;
