@@ -1,26 +1,12 @@
-import { Facet, EditorState } from "@codemirror/state";
-import { InitializeParams, TraceValues } from "vscode-languageserver-protocol";
-import merge from "lodash.merge";
-import { firstAvailable } from "./utils";
+// @ts-check
+
+import { initializeParams } from "./client";
 
 /**
- * The extension to declare Trace.
- *  @type {Facet<TraceValues, TraceValues>}
+ * @param {import("vscode-languageserver-protocol").TraceValues} trace
  */
-export const trace = Facet.define({
-  combine: (values) => firstAvailable(values),
-});
-
-/**
- * Merge the Trace into the provided InitializeParams.
- * @param {EditorState} state
- * @param {InitializeParams} initializeParams
- * @returns {InitializeParams}
- */
-export function mergeTrace(state, initializeParams) {
-  const value = state.facet(trace, false);
-
-  value && merge(initializeParams, { trace: value });
+export default function (trace) {
+  return initializeParams.of({
+    trace,
+  });
 }
-
-export default trace;

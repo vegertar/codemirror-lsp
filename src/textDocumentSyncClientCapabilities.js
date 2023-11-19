@@ -1,50 +1,21 @@
-import { Facet, EditorState } from "@codemirror/state";
-import {
-  TextDocumentSyncClientCapabilities,
-  InitializeParams,
-} from "vscode-languageserver-protocol";
-import merge from "lodash.merge";
-import { firstAvailable } from "./utils";
+// @ts-check
 
-/**
- * The extension to declare TextDocumentSyncClientCapabilities.
- *  @type {Facet<TextDocumentSyncClientCapabilities, TextDocumentSyncClientCapabilities>}
- */
-export const textDocumentSyncClientCapabilities = Facet.define({
-  combine: (values) =>
-    values.length
-      ? firstAvailable(values, {
-          dynamicRegistration: true,
-          willSave: true,
-          willSaveWaitUntil: true,
-          didSave: true,
-        })
-      : null,
-});
+import { initializeParams } from "./client";
 
-/**
- * Merge the TextDocumentSyncClientCapabilities into the provided InitializeParams.
- * @param {EditorState} state
- * @param {InitializeParams} initializeParams
- * @returns {void}
- */
-export function mergeTextDocumentSyncClientCapabilities(
-  state,
-  initializeParams
-) {
-  const synchronization = state.facet(
-    textDocumentSyncClientCapabilities,
-    false
-  );
+/** @type {import("vscode-languageserver-protocol").TextDocumentSyncClientCapabilities} */
+const defaultValue = {
+  dynamicRegistration: true,
+  willSave: true,
+  willSaveWaitUntil: true,
+  didSave: true,
+};
 
-  synchronization &&
-    merge(initializeParams, {
-      capabilities: {
-        textDocument: {
-          synchronization,
-        },
+export default function (synchronization = defaultValue) {
+  return initializeParams.of({
+    capabilities: {
+      textDocument: {
+        synchronization,
       },
-    });
+    },
+  });
 }
-
-export default textDocumentSyncClientCapabilities;

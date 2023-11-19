@@ -1,11 +1,12 @@
 import { Transaction, StateEffectType } from "@codemirror/state";
+import merge from "lodash.merge";
 
 /**
  * Get the first available element from within the provided array, otherwise return the default value.
  * @template T
- * @param {T[]} values
+ * @param {readonly T[]} values
  * @param {T} [x]
- * @returns {T|null|undefined}
+ * @returns {T}
  */
 export function firstAvailable(values, x) {
   if (values) {
@@ -16,6 +17,21 @@ export function firstAvailable(values, x) {
     }
   }
   return x;
+}
+
+/**
+ * Merge all available values from provided candidates.
+ * @template T
+ * @param {readonly T[]} values
+ * @returns {T}
+ */
+export function mergeAvailables(values) {
+  /** @type {T} */
+  const result = {};
+  for (const item of values) {
+    merge(result, item);
+  }
+  return result;
 }
 
 /**

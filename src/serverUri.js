@@ -1,3 +1,5 @@
+// @ts-check
+
 import { Facet } from "@codemirror/state";
 import { firstAvailable } from "./utils";
 
