@@ -25,7 +25,7 @@ export function firstAvailable(values, x) {
  * @param {readonly T[]} values
  * @returns {T}
  */
-export function mergeAvailables(values) {
+export function mergeAll(values) {
   /** @type {T} */
   const result = {};
   for (const item of values) {

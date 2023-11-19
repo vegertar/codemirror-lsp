@@ -20,6 +20,7 @@
   "dependencies": {
     "@codemirror/lang-cpp": "^6.0.2",
     "codemirror": "^6.0.1",
+    "immer": "^10.0.3",
     "lodash.merge": "^4.6.2",
     "reconnecting-websocket": "^4.4.0",
     "vscode-ws-jsonrpc": "^3.1.0",
