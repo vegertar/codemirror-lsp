@@ -9,7 +9,6 @@ import {
 } from "@codemirror/state";
 import { ViewPlugin } from "@codemirror/view";
 import { listen } from "vscode-ws-jsonrpc";
-import { Trace } from "vscode-languageserver-protocol";
 import ReconnectingWebSocket from "reconnecting-websocket";
 
 import * as packageJson from "../package.json";
@@ -19,7 +18,7 @@ import { getLastValueFromTransaction, mergeAll } from "./utils";
 export const { name, version } = packageJson;
 
 /** @type {StateEffectType<import("vscode-languageserver-protocol").MessageConnection>} */
-export const ConnectionStateEffect = StateEffect.define();
+export const connectionEffect = StateEffect.define();
 
 export const connection = StateField.define({
   /** @returns {import("vscode-languageserver-protocol").MessageConnection | null} value */
@@ -27,7 +26,7 @@ export const connection = StateField.define({
     return null;
   },
   update(value, tr) {
-    return getLastValueFromTransaction(tr, ConnectionStateEffect) || value;
+    return getLastValueFromTransaction(tr, connectionEffect) || value;
   },
 });
 
@@ -45,7 +44,7 @@ export const socket = ViewPlugin.define((view) => {
     webSocket,
     onConnection: (connection) => {
       view.dispatch({
-        effects: ConnectionStateEffect.of(connection),
+        effects: connectionEffect.of(connection),
       });
     },
   });
@@ -61,6 +60,50 @@ export const socket = ViewPlugin.define((view) => {
 export const initializeParams = Facet.define({
   combine: (values) => mergeAll(values),
 });
+
+/** @type {StateEffectType<import("vscode-languageserver-protocol").InitializeResult>} */
+export const initializeResultEffect = StateEffect.define();
+
+export const initializeResult = StateField.define({
+  /** @returns {import("vscode-languageserver-protocol").InitializeResult | null} value */
+  create() {
+    return null;
+  },
+  update(value, tr) {
+    // Reset if appeared a new connection
+    if (getLastValueFromTransaction(tr, connectionEffect)) {
+      return null;
+    }
+    return getLastValueFromTransaction(tr, initializeResultEffect) || value;
+  },
+});
+
+export const afterConnectedEffect = StateEffect.define();
+
+export const afterConnected = EditorState.transactionExtender.of((tr) => {
+  return getLastValueFromTransaction(tr, connectionEffect)
+    ? {
+        effects: afterConnectedEffect.of(null),
+      }
+    : null;
+});
+
+/** @type {Facet<Promise, Promise>} */
+export const beforeHandshake = Facet.define({
+  combine: (values) => Promise.all(values),
+});
+
+/**
+ * Retrieve the connection and the result of the handshake.
+ * @param {EditorState} state
+ * @returns {[import("vscode-languageserver-protocol").MessageConnection, import("vscode-languageserver-protocol").InitializeResult | null] | undefined}
+ */
+export function getConnectionAndInitializeResult(state) {
+  const c = state.field(connection);
+  if (c) {
+    return [c, state.field(initializeResult)];
+  }
+}
 
 /**
  * Send request with InitializeParams and wait for InitializeResult from server.
@@ -80,65 +123,38 @@ export async function performHandshake(
 }
 
 /**
- * @type {StateEffectType<import("vscode-languageserver-protocol").InitializeResult>}
- */
-export const InitializeResultStateEffect = StateEffect.define();
-
-/**
- * @type {StateField<import("vscode-languageserver-protocol").InitializeResult | null>}
- */
-export const initializeResult = StateField.define({
-  create() {
-    return null;
-  },
-  /** @param {import("vscode-languageserver-protocol").InitializeResult | null} value */
-  update(value, tr) {
-    return (
-      getLastValueFromTransaction(tr, InitializeResultStateEffect) || value
-    );
-  },
-});
-
-/**
  * The initialize is defined as a ViewPlugin to perform the LSP handshake
  * whenever it detects a transaction of the new connection.
  */
 export const initialize = ViewPlugin.define(() => {
+  let busy = false;
+
   return {
     update(update) {
-      let connection;
-      for (const tr of update.transactions) {
-        connection = getLastValueFromTransaction(tr, ConnectionStateEffect);
-      }
+      const v = getConnectionAndInitializeResult(update.state);
 
-      if (connection) {
-        connection.listen();
-        const params = update.state.facet(initializeParams);
-        // TODO: remove the trace to the trace extension
-        if (params.trace) {
-          connection.trace(Trace.fromString(params.trace), console);
-        }
-        performHandshake(connection, params, {}).then((result) => {
-          update.view.dispatch({
-            effects: InitializeResultStateEffect.of(result),
-          });
-        });
+      if (v && !v[1] && !busy) {
+        busy = true;
+
+        v[0].listen();
+        update.state.facet(beforeHandshake).finally(() =>
+          performHandshake(v[0], update.state.facet(initializeParams), {})
+            .then((result) => {
+              update.view.dispatch({
+                effects: initializeResultEffect.of(result),
+              });
+            })
+            .catch((err) => {
+              console.error("LSP Handshake Failed: ", err);
+            })
+            .finally(() => {
+              busy = false;
+            })
+        );
       }
     },
   };
 });
-
-/**
- * Retrieve the connection and the result of the handshake.
- * @param {EditorState} state
- * @returns {[import("vscode-languageserver-protocol").MessageConnection, import("vscode-languageserver-protocol").InitializeResult | null] | undefined}
- */
-export function getConnectionAndInitializeResult(state) {
-  const c = state.field(connection);
-  if (c) {
-    return [c, state.field(initializeResult)];
-  }
-}
 
 /** @type {import("vscode-languageserver-protocol").InitializeParams} */
 const defaultInitializeParams = {
@@ -152,6 +168,7 @@ export default function (params = defaultInitializeParams) {
   return [
     socket,
     connection,
+    afterConnected,
     initialize,
     initializeResult,
     initializeParams.of(params),

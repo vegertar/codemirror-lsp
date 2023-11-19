@@ -2,7 +2,7 @@ import { Transaction, StateEffectType } from "@codemirror/state";
 import merge from "lodash.merge";
 
 /**
- * Get the first available element from within the provided array, otherwise return the default value.
+ * Get the first available element from within the provided array or the default value.
  * @template T
  * @param {readonly T[]} values
  * @param {T} [x]
@@ -35,15 +35,16 @@ export function mergeAll(values) {
 }
 
 /**
+ * Retrieve the last value corresponding the given StateEffect.
  * @template T
  * @param {Transaction} tr
- * @param {StateEffectType<T>} valueStateEffect
+ * @param {StateEffectType<T>} valueEffect
  * @returns T
  */
-export function getLastValueFromTransaction(tr, valueStateEffect) {
+export function getLastValueFromTransaction(tr, valueEffect) {
   let value;
   for (const effect of tr.effects) {
-    if (effect.is(valueStateEffect)) {
+    if (effect.is(valueEffect)) {
       value = effect.value;
     }
   }
