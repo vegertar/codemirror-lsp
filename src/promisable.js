@@ -11,7 +11,7 @@ import { getLastValueFromTransaction } from "./utils";
 
 /**
  * @param {Facet<Promise, Promise>} facet
- * @param {StateEffectType<null>} effect
+ * @param {StateEffectType} effect
  * @param {(field: PromisableField) => import("@codemirror/state").Extension} create
  * @returns {import("@codemirror/state").Extension[]}
  */

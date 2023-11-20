@@ -14,6 +14,7 @@ import ReconnectingWebSocket from "reconnecting-websocket";
 import * as packageJson from "../package.json";
 import { serverUri } from "./serverUri";
 import { getLastValueFromTransaction, mergeAll } from "./utils";
+import { promisable } from "./promisable";
 
 export const { name, version } = packageJson;
 
@@ -78,21 +79,6 @@ export const initializeResult = StateField.define({
   },
 });
 
-export const afterConnectedEffect = StateEffect.define();
-
-export const afterConnected = EditorState.transactionExtender.of((tr) => {
-  return getLastValueFromTransaction(tr, connectionEffect)
-    ? {
-        effects: afterConnectedEffect.of(null),
-      }
-    : null;
-});
-
-/** @type {Facet<Promise, Promise>} */
-export const beforeHandshake = Facet.define({
-  combine: (values) => Promise.all(values),
-});
-
 /**
  * Retrieve the connection and the result of the handshake.
  * @param {EditorState} state
@@ -122,6 +108,63 @@ export async function performHandshake(
   return result;
 }
 
+export class BeforeHandshake {
+  /** @type {Facet<Promise, Promise>} */
+  static promise = Facet.define({
+    combine: (values) => Promise.all(values),
+  });
+
+  /**
+   * @typedef ResolverRejector
+   * @type {(state: import("@codemirror/state").EditorState) => ((value?: any) => void) | undefined}
+   */
+
+  /**
+   * @template {import("@codemirror/view").PluginValue} V
+   * @param {(view: import("@codemirror/view").EditorView, resolver: ResolverRejector, rejector: ResolverRejector) => V} create
+   * @param {import("@codemirror/view").PluginSpec} [spec]
+   * @returns
+   */
+  static define(create, spec) {
+    return promisable(BeforeHandshake.promise, connectionEffect, (field) =>
+      ViewPlugin.define(
+        (view) =>
+          create(
+            view,
+            (state) => state.field(field)?.[1],
+            (state) => state.field(field)?.[2]
+          ),
+        spec
+      )
+    );
+  }
+
+  /**
+   *
+   * @param {(update: import("@codemirror/view").ViewUpdate, connection: import("vscode-languageserver-protocol").MessageConnection) => Promise<void>} fn
+   */
+  static fromUpdate(fn) {
+    return BeforeHandshake.define((_, resolver) => {
+      let busy = false;
+
+      return {
+        update(update) {
+          const v = getConnectionAndInitializeResult(update.state);
+
+          if (v && !v[1] && !busy) {
+            const resolve = resolver(update.state);
+            if (!resolve) {
+              throw new Error("Resolve is unavailable");
+            }
+
+            return fn(update, v[0]).finally(resolve);
+          }
+        },
+      };
+    });
+  }
+}
+
 /**
  * The initialize is defined as a ViewPlugin to perform the LSP handshake
  * whenever it detects a transaction of the new connection.
@@ -137,7 +180,7 @@ export const initialize = ViewPlugin.define(() => {
         busy = true;
 
         v[0].listen();
-        update.state.facet(beforeHandshake).finally(() =>
+        update.state.facet(BeforeHandshake.promise).finally(() =>
           performHandshake(v[0], update.state.facet(initializeParams), {})
             .then((result) => {
               update.view.dispatch({
@@ -168,7 +211,6 @@ export default function (params = defaultInitializeParams) {
   return [
     socket,
     connection,
-    afterConnected,
     initialize,
     initializeResult,
     initializeParams.of(params),
