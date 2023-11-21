@@ -1,14 +1,13 @@
-import { Transaction, StateEffectType } from "@codemirror/state";
 import merge from "lodash.merge";
 
 /**
  * Get the first available element from within the provided array or the default value.
  * @template T
  * @param {readonly T[]} values
- * @param {T} [x]
- * @returns {T}
+ * @param {T} [defaultValue]
+ * @returns {T | undefined}
  */
-export function firstAvailable(values, x) {
+export function firstAvailable(values, defaultValue) {
   if (values) {
     for (const v of values) {
       if (v) {
@@ -16,29 +15,29 @@ export function firstAvailable(values, x) {
       }
     }
   }
-  return x;
+  return defaultValue;
 }
 
 /**
  * Merge all available values from provided candidates.
- * @template T
+ * @template {object} T
  * @param {readonly T[]} values
  * @returns {T}
  */
 export function mergeAll(values) {
-  /** @type {T} */
   const result = {};
   for (const item of values) {
     merge(result, item);
   }
+  // @ts-ignore
   return result;
 }
 
 /**
  * Retrieve the last value corresponding the given StateEffect.
  * @template T
- * @param {Transaction} tr
- * @param {StateEffectType<T>} valueEffect
+ * @param {import("@codemirror/state").Transaction} tr
+ * @param {import("@codemirror/state").StateEffectType<T>} valueEffect
  * @returns T
  */
 export function getLastValueFromTransaction(tr, valueEffect) {
@@ -49,4 +48,19 @@ export function getLastValueFromTransaction(tr, valueEffect) {
     }
   }
   return value;
+}
+
+/**
+ * Convert given text position from CodeMirror to the LSP Position.
+ * @param {number} pos
+ * @param {import("@codemirror/state").Text} text
+ * @returns {import("vscode-languageserver-protocol").Position}
+ */
+export function cmPositionToLspPosition(pos, text) {
+  const line = text.lineAt(pos);
+
+  return {
+    line: line.number - 1,
+    character: pos - line.from,
+  };
 }

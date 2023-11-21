@@ -23,7 +23,7 @@ const wss = new WebSocketServer(
   () => {
     const { address: host, port } = wss.address();
     console.log(`Listening to WebSocket request on ${host}:${port}`);
-  }
+  },
 );
 
 wss.on("connection", (socket, request) => {

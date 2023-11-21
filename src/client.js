@@ -1,12 +1,6 @@
 // @ts-check
 
-import {
-  EditorState,
-  StateField,
-  StateEffect,
-  StateEffectType,
-  Facet,
-} from "@codemirror/state";
+import { StateField, StateEffect, Facet } from "@codemirror/state";
 import { ViewPlugin } from "@codemirror/view";
 import { listen } from "vscode-ws-jsonrpc";
 import ReconnectingWebSocket from "reconnecting-websocket";
@@ -18,7 +12,7 @@ import { promisable } from "./promisable";
 
 export const { name, version } = packageJson;
 
-/** @type {StateEffectType<import("vscode-languageserver-protocol").MessageConnection>} */
+/** @type {import("@codemirror/state").StateEffectType<import("vscode-languageserver-protocol").MessageConnection>} */
 export const connectionEffect = StateEffect.define();
 
 export const connection = StateField.define({
@@ -62,7 +56,7 @@ export const initializeParams = Facet.define({
   combine: (values) => mergeAll(values),
 });
 
-/** @type {StateEffectType<import("vscode-languageserver-protocol").InitializeResult>} */
+/** @type {import("@codemirror/state").StateEffectType<import("vscode-languageserver-protocol").InitializeResult>} */
 export const initializeResultEffect = StateEffect.define();
 
 export const initializeResult = StateField.define({
@@ -81,7 +75,7 @@ export const initializeResult = StateField.define({
 
 /**
  * Retrieve the connection and the result of the handshake.
- * @param {EditorState} state
+ * @param {import("@codemirror/state").EditorState} state
  * @returns {[import("vscode-languageserver-protocol").MessageConnection, import("vscode-languageserver-protocol").InitializeResult | null] | undefined}
  */
 export function getConnectionAndInitializeResult(state) {
@@ -101,7 +95,7 @@ export function getConnectionAndInitializeResult(state) {
 export async function performHandshake(
   connection,
   initializeParams,
-  initializedParams
+  initializedParams,
 ) {
   const result = await connection.sendRequest("initialize", initializeParams);
   await connection.sendNotification("initialized", initializedParams);
@@ -132,10 +126,10 @@ export class BeforeHandshake {
           create(
             view,
             (state) => state.field(field)?.[1],
-            (state) => state.field(field)?.[2]
+            (state) => state.field(field)?.[2],
           ),
-        spec
-      )
+        spec,
+      ),
     );
   }
 
@@ -192,7 +186,7 @@ export const initialize = ViewPlugin.define(() => {
             })
             .finally(() => {
               busy = false;
-            })
+            }),
         );
       }
     },
