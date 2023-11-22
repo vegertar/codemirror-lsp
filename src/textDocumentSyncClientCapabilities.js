@@ -8,7 +8,7 @@ import { getConnectionAndInitializeResult, initializeParams } from "./client";
 import { cmPositionToLspPosition } from "./utils";
 
 export const textDocument = StateField.define({
-  /** @returns {Omit<import("vscode-languageserver-protocol").TextDocumentItem, "text">} */
+  /** @returns {Omit<import("vscode-languageserver-types").TextDocumentItem, "text">} */
   create() {
     return {
       uri: "untitled:Untitled",
@@ -41,7 +41,7 @@ class TextDocumentSynchronization {
   }
 
   /**
-   * @param {import("vscode-languageserver-protocol").MessageConnection} c
+   * @param {import("vscode-jsonrpc").MessageConnection} c
    * @param {import("vscode-languageserver-protocol").DidOpenTextDocumentParams} params
    */
   didOpen(c, params) {
@@ -52,7 +52,7 @@ class TextDocumentSynchronization {
   }
 
   /**
-   * @param {import("vscode-languageserver-protocol").MessageConnection} c
+   * @param {import("vscode-jsonrpc").MessageConnection} c
    * @param {import("vscode-languageserver-protocol").DidCloseTextDocumentParams} params
    */
   didClose(c, params) {
@@ -64,7 +64,7 @@ class TextDocumentSynchronization {
   }
 
   /**
-   * @param {import("vscode-languageserver-protocol").MessageConnection} c
+   * @param {import("vscode-jsonrpc").MessageConnection} c
    * @param {import("vscode-languageserver-protocol").DidChangeTextDocumentParams} params
    */
   didChange(c, params) {
@@ -75,7 +75,7 @@ class TextDocumentSynchronization {
   }
 
   /**
-   * @param {import("vscode-languageserver-protocol").MessageConnection} c
+   * @param {import("vscode-jsonrpc").MessageConnection} c
    */
   didPendingChanges(c) {
     const n = this.pendingChanges.length;

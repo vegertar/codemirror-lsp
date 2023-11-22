@@ -1,10 +1,10 @@
 // @ts-check
 
-import { Trace } from "vscode-languageserver-protocol";
+import { Trace } from "vscode-jsonrpc";
 
 import { BeforeHandshake, initializeParams } from "./client";
 
-export const setTrace = BeforeHandshake.fromUpdate(async (update, c) => {
+export const setTrace = BeforeHandshake.from(async (update, c) => {
   const value = update.state.facet(initializeParams).trace;
   if (value) {
     await c.trace(Trace.fromString(value), console);
@@ -12,7 +12,7 @@ export const setTrace = BeforeHandshake.fromUpdate(async (update, c) => {
 });
 
 /**
- * @param {import("vscode-languageserver-protocol").TraceValues} [value]
+ * @param {import("vscode-jsonrpc").TraceValues} [value]
  */
 export default function (value) {
   return [setTrace, initializeParams.of({ trace: value })];

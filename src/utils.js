@@ -54,7 +54,7 @@ export function getLastValueFromTransaction(tr, valueEffect) {
  * Convert given text position from CodeMirror to the LSP Position.
  * @param {number} pos
  * @param {import("@codemirror/state").Text} text
- * @returns {import("vscode-languageserver-protocol").Position}
+ * @returns {import("vscode-languageserver-types").Position}
  */
 export function cmPositionToLspPosition(pos, text) {
   const line = text.lineAt(pos);
@@ -63,4 +63,33 @@ export function cmPositionToLspPosition(pos, text) {
     line: line.number - 1,
     character: pos - line.from,
   };
+}
+
+/**
+ * Convert given text position from LSP to the CodeMirror Position.
+ * @param {import("vscode-languageserver-types").Position} pos
+ * @param {import("@codemirror/state").Text} text
+ * @returns {number}
+ */
+export function lspPositionToCmPosition(pos, text) {
+  const line = text.line(pos.line + 1);
+  return line.from + pos.character;
+}
+
+/**
+ * Convert the diagnostic severity from LSP to CodeMirror.
+ * @param {import("vscode-languageserver-types").DiagnosticSeverity | undefined} severity
+ * @returns {import("@codemirror/lint").Diagnostic['severity']}
+ */
+export function lspSeverityToCmServerity(severity) {
+  switch (severity) {
+    case 1:
+      return "error";
+    case 2:
+      return "warning";
+    case 3:
+      return "info";
+    default:
+      return "hint";
+  }
 }

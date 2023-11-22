@@ -12,11 +12,11 @@ import { promisable } from "./promisable";
 
 export const { name, version } = packageJson;
 
-/** @type {import("@codemirror/state").StateEffectType<import("vscode-languageserver-protocol").MessageConnection>} */
+/** @type {import("@codemirror/state").StateEffectType<import("vscode-jsonrpc").MessageConnection>} */
 export const connectionEffect = StateEffect.define();
 
 export const connection = StateField.define({
-  /** @returns {import("vscode-languageserver-protocol").MessageConnection | null} value */
+  /** @returns {import("vscode-jsonrpc").MessageConnection | null} value */
   create() {
     return null;
   },
@@ -76,7 +76,7 @@ export const initializeResult = StateField.define({
 /**
  * Retrieve the connection and the result of the handshake.
  * @param {import("@codemirror/state").EditorState} state
- * @returns {[import("vscode-languageserver-protocol").MessageConnection, import("vscode-languageserver-protocol").InitializeResult | null] | undefined}
+ * @returns {[import("vscode-jsonrpc").MessageConnection, import("vscode-languageserver-protocol").InitializeResult | null] | undefined}
  */
 export function getConnectionAndInitializeResult(state) {
   const c = state.field(connection);
@@ -87,7 +87,7 @@ export function getConnectionAndInitializeResult(state) {
 
 /**
  * Send request with InitializeParams and wait for InitializeResult from server.
- * @param {import("vscode-languageserver-protocol").MessageConnection} connection
+ * @param {import("vscode-jsonrpc").MessageConnection} connection
  * @param {Partial<import("vscode-languageserver-protocol").InitializeParams>} initializeParams
  * @param {import("vscode-languageserver-protocol").InitializedParams} initializedParams
  * @returns {Promise<import("vscode-languageserver-protocol").InitializeResult>}
@@ -135,11 +135,14 @@ export class BeforeHandshake {
 
   /**
    *
-   * @param {(update: import("@codemirror/view").ViewUpdate, connection: import("vscode-languageserver-protocol").MessageConnection) => Promise<void>} fn
+   * @param {(update: import("@codemirror/view").ViewUpdate, connection: import("vscode-jsonrpc").MessageConnection) => Promise<void | (() => void)>} fn The async routine used to operate the connection before handshake, in which an optional cleanup process is returned.
    */
-  static fromUpdate(fn) {
+  static from(fn) {
     return BeforeHandshake.define((_, resolver) => {
       let busy = false;
+
+      /** @type {null | (() => void)} */
+      let cleanup = null;
 
       return {
         update(update) {
@@ -151,8 +154,23 @@ export class BeforeHandshake {
               throw new Error("Resolve is unavailable");
             }
 
-            return fn(update, v[0]).finally(resolve);
+            if (cleanup) {
+              cleanup();
+              cleanup = null;
+            }
+
+            return fn(update, v[0])
+              .then((cleanupFn) => {
+                if (cleanupFn) {
+                  cleanup = cleanupFn;
+                }
+              })
+              .finally(resolve);
           }
+        },
+
+        destroy() {
+          cleanup?.();
         },
       };
     });
