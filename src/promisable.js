@@ -1,17 +1,18 @@
 // @ts-check
 
-import { StateField, StateEffectType, Facet } from "@codemirror/state";
+import { StateField } from "@codemirror/state";
 
 import { getLastValueFromTransaction } from "./utils";
 
 /**
  * @typedef PromisableField
- * @type {StateField<null | [Promise<any>, (value?: any) => void, (reason?: any) => void]>}
+ * @type {StateField<null | [Promise<void>, () => void, (reason?: any) => void]>}
  */
 
 /**
- * @param {Facet<Promise, Promise>} facet
- * @param {StateEffectType} effect
+ * @template U
+ * @param {import("@codemirror/state").Facet<Promise<void>, Promise<void | void[]>>} facet
+ * @param {import("@codemirror/state").StateEffectType<U>} effect
  * @param {(field: PromisableField) => import("@codemirror/state").Extension} create
  * @returns {import("@codemirror/state").Extension[]}
  */

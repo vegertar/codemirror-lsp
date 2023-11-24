@@ -1,5 +1,7 @@
-#!/usr/bin/env node
+// ts-check
+/* eslint-env node */
 
+import assert from "assert";
 import { WebSocketServer } from "ws";
 import {
   createServerProcess,
@@ -17,18 +19,31 @@ if (!isNaN(port)) {
 const magic = argv[0] || process.env.MAGIC || "ls";
 const wss = new WebSocketServer(
   {
-    port: port || process.env.PORT || 3000,
+    port: port || parseInt(process.env.PORT || "") || 3000,
     perMessageDeflate: false,
   },
   () => {
-    const { address: host, port } = wss.address();
-    console.log(`Listening to WebSocket request on ${host}:${port}`);
+    const v = wss.address();
+    if (typeof v == "string") {
+      console.log(`Listening to WebSocket request on ${v}`);
+    } else {
+      const { address: host, port } = v;
+      console.log(`Listening to WebSocket request on ${host}:${port}`);
+    }
   },
 );
 
 wss.on("connection", (socket, request) => {
+  if (!request.url) {
+    console.error("Nil URL");
+    socket.close();
+    return;
+  }
+
   const url = new URL(request.url, `http://${request.headers.host}`);
   const [_, ls, type] = url.pathname.split("/", 3);
+  assert.deepEqual(_, "");
+
   if (ls != magic) {
     console.error(`URL should be starting with /${magic}/`, request.url);
     socket.close();
@@ -37,6 +52,13 @@ wss.on("connection", (socket, request) => {
 
   const command = `.${url.pathname}/run`;
   const rpcProcess = createServerProcess(type, command, [url.search]);
+  if (!rpcProcess) {
+    console.error("Invalid command", command);
+    socket.close();
+    return;
+  }
+
+  // @ts-ignore
   const rpcSocket = toSocket(socket);
   forward(createWebSocketConnection(rpcSocket), rpcProcess);
 

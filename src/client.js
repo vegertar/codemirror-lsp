@@ -9,6 +9,7 @@ import * as packageJson from "../package.json";
 import { serverUri } from "./serverUri";
 import { getLastValueFromTransaction, mergeAll } from "./utils";
 import { promisable } from "./promisable";
+import merge from "lodash.merge";
 
 export const { name, version } = packageJson;
 
@@ -103,7 +104,7 @@ export async function performHandshake(
 }
 
 export class BeforeHandshake {
-  /** @type {Facet<Promise, Promise>} */
+  /** @type {Facet<Promise<void>, Promise<void[]>>} */
   static promise = Facet.define({
     combine: (values) => Promise.all(values),
   });
@@ -116,7 +117,7 @@ export class BeforeHandshake {
   /**
    * @template {import("@codemirror/view").PluginValue} V
    * @param {(view: import("@codemirror/view").EditorView, resolver: ResolverRejector, rejector: ResolverRejector) => V} create
-   * @param {import("@codemirror/view").PluginSpec} [spec]
+   * @param {import("@codemirror/view").PluginSpec<V>} [spec]
    * @returns
    */
   static define(create, spec) {
@@ -219,12 +220,17 @@ const defaultInitializeParams = {
   rootUri: null,
 };
 
-export default function (params = defaultInitializeParams) {
+/**
+ *
+ * @param {Partial<import("vscode-languageserver-protocol").InitializeParams>} [params]
+ * @returns {import("@codemirror/state").Extension}
+ */
+export default function (params) {
   return [
     socket,
     connection,
     initialize,
     initializeResult,
-    initializeParams.of(params),
+    initializeParams.of(merge({}, defaultInitializeParams, params)),
   ];
 }

@@ -1,6 +1,21 @@
 import merge from "lodash.merge";
 
 /**
+ * @template T
+ * @overload
+ * @param {readonly T[]} values
+ * @returns {T | undefined}
+ */
+
+/**
+ * @template T
+ * @overload
+ * @param {readonly T[]} values
+ * @param {T} defaultValue
+ * @returns {T}
+ */
+
+/**
  * Get the first available element from within the provided array or the default value.
  * @template T
  * @param {readonly T[]} values

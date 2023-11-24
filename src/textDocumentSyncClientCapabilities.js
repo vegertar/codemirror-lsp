@@ -177,12 +177,7 @@ export const textDocumentSynchronization = ViewPlugin.fromClass(
 );
 
 /** @type {import("vscode-languageserver-protocol").TextDocumentSyncClientCapabilities} */
-const defaultValue = {
-  dynamicRegistration: true,
-  willSave: true,
-  willSaveWaitUntil: true,
-  didSave: true,
-};
+const defaultValue = {};
 
 export default function (value = defaultValue) {
   return [

@@ -1,14 +1,9 @@
 // @ts-check
 
-import { linter } from "@codemirror/lint";
 import { StateField, StateEffect } from "@codemirror/state";
 
 import { BeforeHandshake, initializeParams } from "./client";
-import {
-  getLastValueFromTransaction,
-  lspPositionToCmPosition,
-  lspSeverityToCmServerity,
-} from "./utils";
+import { getLastValueFromTransaction } from "./utils";
 
 /** @type {import("@codemirror/state").StateEffectType<import("vscode-languageserver-protocol").PublishDiagnosticsParams>} */
 export const publishDiagnosticsEffect = StateEffect.define();
@@ -37,29 +32,6 @@ export const publishDiagnosticsNotification = BeforeHandshake.from(
   },
 );
 
-export const diagnosticLinter = linter(
-  (view) => {
-    const params = view.state.field(publishDiagnosticsParams);
-    if (params) {
-      return params.diagnostics.map((item) => ({
-        from: lspPositionToCmPosition(item.range.start, view.state.doc),
-        to: lspPositionToCmPosition(item.range.end, view.state.doc),
-        severity: lspSeverityToCmServerity(item.severity),
-        message: item.message,
-      }));
-    }
-
-    return [];
-  },
-  {
-    needsRefresh(update) {
-      const oldValue = update.startState.field(publishDiagnosticsParams);
-      const newValue = update.state.field(publishDiagnosticsParams);
-      return oldValue !== newValue;
-    },
-  },
-);
-
 /** @type {import("vscode-languageserver-protocol").PublishDiagnosticsClientCapabilities} */
 const defaultValue = {
   relatedInformation: true,
@@ -73,7 +45,6 @@ const defaultValue = {
 
 export default function (value = defaultValue) {
   return [
-    diagnosticLinter,
     publishDiagnosticsParams,
     publishDiagnosticsNotification,
     initializeParams.of({
