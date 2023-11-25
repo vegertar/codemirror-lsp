@@ -9,11 +9,13 @@ import * as packageJson from "../package.json";
 import { serverUri } from "./serverUri";
 import { getLastValueFromTransaction, mergeAll } from "./utils";
 import { promisable } from "./promisable";
-import merge from "lodash.merge";
 
 export const { name, version } = packageJson;
 
-/** @type {import("@codemirror/state").StateEffectType<import("vscode-jsonrpc").MessageConnection>} */
+/**
+ * An effect to notify there is a new connection.
+ * @type {import("@codemirror/state").StateEffectType<import("vscode-jsonrpc").MessageConnection>}
+ */
 export const connectionEffect = StateEffect.define();
 
 export const connection = StateField.define({
@@ -57,7 +59,10 @@ export const initializeParams = Facet.define({
   combine: (values) => mergeAll(values),
 });
 
-/** @type {import("@codemirror/state").StateEffectType<import("vscode-languageserver-protocol").InitializeResult>} */
+/**
+ * An effect to notify the handshake is finished.
+ * @type {import("@codemirror/state").StateEffectType<import("vscode-languageserver-protocol").InitializeResult>}
+ */
 export const initializeResultEffect = StateEffect.define();
 
 export const initializeResult = StateField.define({
@@ -212,25 +217,15 @@ export const initialize = ViewPlugin.define(() => {
   };
 });
 
-/** @type {import("vscode-languageserver-protocol").InitializeParams} */
-const defaultInitializeParams = {
-  processId: null,
-  clientInfo: { name, version },
-  capabilities: {},
-  rootUri: null,
-};
-
-/**
- *
- * @param {Partial<import("vscode-languageserver-protocol").InitializeParams>} [params]
- * @returns {import("@codemirror/state").Extension}
- */
-export default function (params) {
+export default function () {
   return [
     socket,
     connection,
     initialize,
     initializeResult,
-    initializeParams.of(merge({}, defaultInitializeParams, params)),
+    initializeParams.of({
+      processId: null,
+      clientInfo: { name, version },
+    }),
   ];
 }

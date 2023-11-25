@@ -1,12 +1,16 @@
 // @ts-check
 
-import { StateField } from "@codemirror/state";
+import { StateField, StateEffect } from "@codemirror/state";
 import { ViewPlugin } from "@codemirror/view";
 import { produce } from "immer";
 
 import { getConnectionAndInitializeResult, initializeParams } from "./client";
-import { cmPositionToLspPosition } from "./utils";
+import { cmPositionToLspPosition, getLastValueFromTransaction } from "./utils";
 
+/**
+ * The textDocument extension carries the fields mentioned by LSP TextDocumentItem
+ * except the text content, which must be owned by the hosted EditState.
+ */
 export const textDocument = StateField.define({
   /** @returns {Omit<import("vscode-languageserver-types").TextDocumentItem, "text">} */
   create() {
@@ -25,8 +29,28 @@ export const textDocument = StateField.define({
   },
 });
 
-class TextDocumentSynchronization {
-  /** @type {0 | 1 | 2 | 3} 0: closed, 1: opening, 2: open, 3: changing */
+export class TextDocumentSynchronization {
+  /**
+   * An effect to notify that the text document has had synchronizations up to the given version number.
+   * Specially, 0 means not synced at all or did close, 1 means did open.
+   * @type {import("@codemirror/state").StateEffectType<number>}
+   */
+  static didEffect = StateEffect.define();
+
+  static didVersion = StateField.define({
+    create() {
+      return 0;
+    },
+    update(value, tr) {
+      const effect = getLastValueFromTransaction(
+        tr,
+        TextDocumentSynchronization.didEffect,
+      );
+      return effect !== undefined ? effect : value;
+    },
+  });
+
+  /** @type {0 | 1 | 2 | 3 | 4} 0: closed, 1: opening, 2: open, 3: changing, 4: closing */
   didState = 0;
 
   /** @type {import("vscode-languageserver-protocol").TextDocumentSyncOptions} */
@@ -40,6 +64,13 @@ class TextDocumentSynchronization {
     this.view = view;
   }
 
+  /** @param {number} version */
+  did(version) {
+    this.view.dispatch({
+      effects: TextDocumentSynchronization.didEffect.of(version),
+    });
+  }
+
   /**
    * @param {import("vscode-jsonrpc").MessageConnection} c
    * @param {import("vscode-languageserver-protocol").DidOpenTextDocumentParams} params
@@ -48,6 +79,7 @@ class TextDocumentSynchronization {
     this.didState = 1;
     c.sendNotification("textDocument/didOpen", params).then(() => {
       this.didState = 2;
+      this.did(params.textDocument.version);
     });
   }
 
@@ -60,7 +92,11 @@ class TextDocumentSynchronization {
       console.error(`There are ${this.pendingChanges.length} unsynced changes`);
     }
 
-    c.sendNotification("textDocument/didClose", params);
+    this.didState = 4;
+    c.sendNotification("textDocument/didClose", params).then(() => {
+      this.didState = 0;
+      this.did(0);
+    });
   }
 
   /**
@@ -71,6 +107,7 @@ class TextDocumentSynchronization {
     this.didState = 3;
     c.sendNotification("textDocument/didChange", params).then(() => {
       this.didState = 2;
+      this.did(params.textDocument.version);
     });
   }
 
@@ -95,7 +132,7 @@ class TextDocumentSynchronization {
   /**
    * Implementation of the ViewPlugin update.
    * @param {import("@codemirror/view").ViewUpdate} update
-   * @returns
+   * @returns {void}
    */
   update(update) {
     const v = getConnectionAndInitializeResult(update.state);
@@ -104,6 +141,10 @@ class TextDocumentSynchronization {
       this.didState = 0;
       this.pendingChanges.length = 0;
       return;
+    }
+
+    if (this.didState === 4) {
+      throw new Error("Cannot update a closing document");
     }
 
     const currentTextDocument = update.state.field(textDocument);
@@ -172,21 +213,19 @@ class TextDocumentSynchronization {
   }
 }
 
-export const textDocumentSynchronization = ViewPlugin.fromClass(
-  TextDocumentSynchronization,
-);
+export const textDocumentSynchronization = [
+  TextDocumentSynchronization.didVersion,
+  ViewPlugin.fromClass(TextDocumentSynchronization),
+];
 
-/** @type {import("vscode-languageserver-protocol").TextDocumentSyncClientCapabilities} */
-const defaultValue = {};
-
-export default function (value = defaultValue) {
+export default function () {
   return [
     textDocument,
     textDocumentSynchronization,
     initializeParams.of({
       capabilities: {
         textDocument: {
-          synchronization: value,
+          synchronization: {},
         },
       },
     }),

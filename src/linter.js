@@ -2,7 +2,11 @@
 
 import { linter } from "@codemirror/lint";
 import { publishDiagnosticsParams } from "./publishDiagnosticsClientCapabilities";
-import { lspPositionToCmPosition, lspSeverityToCmServerity } from "./utils";
+import {
+  lspPositionToCmPosition,
+  lspSeverityToCmServerity,
+  getValueIfNeedsRefresh,
+} from "./utils";
 
 export const diagnosticLinter = linter(
   (view) => {
@@ -20,9 +24,9 @@ export const diagnosticLinter = linter(
   },
   {
     needsRefresh(update) {
-      const oldValue = update.startState.field(publishDiagnosticsParams);
-      const newValue = update.state.field(publishDiagnosticsParams);
-      return oldValue !== newValue;
+      return (
+        getValueIfNeedsRefresh(update, publishDiagnosticsParams) !== undefined
+      );
     },
   },
 );

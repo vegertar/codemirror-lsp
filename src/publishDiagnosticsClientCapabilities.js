@@ -32,25 +32,22 @@ export const publishDiagnosticsNotification = BeforeHandshake.from(
   },
 );
 
-/** @type {import("vscode-languageserver-protocol").PublishDiagnosticsClientCapabilities} */
-const defaultValue = {
-  relatedInformation: true,
-  versionSupport: false,
-  tagSupport: {
-    valueSet: [1, 2],
-  },
-  codeDescriptionSupport: true,
-  dataSupport: true,
-};
-
-export default function (value = defaultValue) {
+export default function () {
   return [
     publishDiagnosticsParams,
     publishDiagnosticsNotification,
     initializeParams.of({
       capabilities: {
         textDocument: {
-          publishDiagnostics: value,
+          publishDiagnostics: {
+            relatedInformation: true,
+            versionSupport: false,
+            tagSupport: {
+              valueSet: [1, 2],
+            },
+            codeDescriptionSupport: true,
+            dataSupport: true,
+          },
         },
       },
     }),

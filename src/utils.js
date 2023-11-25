@@ -53,7 +53,7 @@ export function mergeAll(values) {
  * @template T
  * @param {import("@codemirror/state").Transaction} tr
  * @param {import("@codemirror/state").StateEffectType<T>} valueEffect
- * @returns T
+ * @returns {T | undefined}
  */
 export function getLastValueFromTransaction(tr, valueEffect) {
   let value;
@@ -107,4 +107,18 @@ export function lspSeverityToCmServerity(severity) {
     default:
       return "hint";
   }
+}
+
+/**
+ * Examine if a refresh is needed by comparing the provided state field's old and new values.
+ * The new value is returned if true.
+ * @template T
+ * @param {{state: import("@codemirror/state").EditorState, startState: import("@codemirror/state").EditorState}} param0
+ * @param {import("@codemirror/state").StateField<T extends undefined ? never : T>} field
+ * @returns {T | undefined}
+ */
+export function getValueIfNeedsRefresh({ state, startState }, field) {
+  const oldValue = startState.field(field);
+  const newValue = state.field(field);
+  return oldValue !== newValue ? newValue : undefined;
 }
