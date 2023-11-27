@@ -1,8 +1,8 @@
 // @ts-check
 
 import { StateField, StateEffect } from "@codemirror/state";
-import { ViewPlugin } from "@codemirror/view";
 import { produce } from "immer";
+import { ViewPlugin } from "@codemirror/view";
 
 import { getConnectionAndInitializeResult, initializeParams } from "./client";
 import { getLastValueFromTransaction, getValueIfNeedsRefresh } from "./utils";
@@ -22,8 +22,7 @@ export class DocumentLinkProvider {
     },
     update(value, tr) {
       return (
-        getLastValueFromTransaction(tr, DocumentLinkProvider.effect) ||
-        (tr.docChanged ? null : value)
+        getLastValueFromTransaction(tr, DocumentLinkProvider.effect) || value
       );
     },
   });
@@ -69,12 +68,17 @@ export class DocumentLinkProvider {
   }
 }
 
+/**
+ * @typedef ResolvedDocumentLink
+ * @type {Omit<import("vscode-languageserver-types").DocumentLink, "target"> & {target: import("vscode-languageserver-types").URI}}
+ */
+
 export class DocumentLinkResolver {
-  /** @type {import("@codemirror/state").StateEffectType<import("vscode-languageserver-types").DocumentLink>} */
+  /** @type {import("@codemirror/state").StateEffectType<ResolvedDocumentLink>} */
   static effect = StateEffect.define();
 
   static links = StateField.define({
-    /** @returns {import("vscode-languageserver-types").DocumentLink[]} */
+    /** @returns {ResolvedDocumentLink[]} */
     create() {
       return [];
     },
@@ -119,15 +123,20 @@ export class DocumentLinkResolver {
 
     const newLinks = getValueIfNeedsRefresh(update, DocumentLinkProvider.links);
     if (newLinks !== undefined) {
-      newLinks?.forEach((link) =>
-        this.resolveDocumentLink(v[0], link)
-          .then((link) =>
-            update.view.dispatch({
-              effects: DocumentLinkResolver.effect.of(link),
-            }),
-          )
-          .catch(console.error),
-      );
+      newLinks?.forEach((link) => {
+        if (!link.target) {
+          this.resolveDocumentLink(v[0], link)
+            .then(
+              (link) =>
+                link.target &&
+                update.view.dispatch({
+                  // @ts-ignore
+                  effects: DocumentLinkResolver.effect.of(link),
+                }),
+            )
+            .catch(console.error);
+        }
+      });
     }
   }
 }

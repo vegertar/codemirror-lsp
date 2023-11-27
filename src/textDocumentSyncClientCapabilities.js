@@ -4,8 +4,12 @@ import { StateField, StateEffect } from "@codemirror/state";
 import { ViewPlugin } from "@codemirror/view";
 import { produce } from "immer";
 
-import { getConnectionAndInitializeResult, initializeParams } from "./client";
-import { cmPositionToLspPosition, getLastValueFromTransaction } from "./utils";
+import {
+  getConnectionAndInitializeResult,
+  initializeParams,
+  initializeResultEffect,
+} from "./client";
+import { cmPositionToLspPosition } from "./utils";
 
 /**
  * The textDocument extension carries the fields mentioned by LSP TextDocumentItem
@@ -32,21 +36,28 @@ export const textDocument = StateField.define({
 export class TextDocumentSynchronization {
   /**
    * An effect to notify that the text document has had synchronizations up to the given version number.
-   * Specially, 0 means not synced at all or did close, 1 means did open.
+   * Specially, 0 means not synced at all or did close.
    * @type {import("@codemirror/state").StateEffectType<number>}
    */
   static didEffect = StateEffect.define();
 
+  /**
+   * The state field of the version number that the text document has had synchronizations up to.
+   * Specially, 0 means not synced at all or did close.
+   */
   static didVersion = StateField.define({
     create() {
       return 0;
     },
     update(value, tr) {
-      const effect = getLastValueFromTransaction(
-        tr,
-        TextDocumentSynchronization.didEffect,
-      );
-      return effect !== undefined ? effect : value;
+      for (const effect of tr.effects) {
+        if (effect.is(TextDocumentSynchronization.didEffect)) {
+          value = effect.value;
+        } else if (effect.is(initializeResultEffect)) {
+          value = 0;
+        }
+      }
+      return value;
     },
   });
 
@@ -89,7 +100,9 @@ export class TextDocumentSynchronization {
    */
   didClose(c, params) {
     if (this.pendingChanges.length) {
-      console.error(`There are ${this.pendingChanges.length} unsynced changes`);
+      console.error(
+        `There are ${this.pendingChanges.length} not synchronized changes`,
+      );
     }
 
     this.didState = 4;
@@ -136,7 +149,7 @@ export class TextDocumentSynchronization {
    */
   update(update) {
     const v = getConnectionAndInitializeResult(update.state);
-    // Reset states if either is not connected or is not handshaked
+    // Reset states if either is not connected or has not completed the handshake.
     if (!v || !v[1]) {
       this.didState = 0;
       this.pendingChanges.length = 0;

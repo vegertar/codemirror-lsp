@@ -16,9 +16,11 @@ import documentLinkClientCapabilities from "./documentLinkClientCapabilities";
 
 new EditorView({
   doc: String.raw`#include <stdio.h>
+#include <stdlib.h>
 
 int main() {
   printf("Hello World\n");
+  exit(0);
 }`,
   extensions: [
     basicSetup,

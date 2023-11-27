@@ -92,11 +92,24 @@ export function lspPositionToCmPosition(pos, text) {
 }
 
 /**
+ * Convert given text position from LSP to the CodeMirror Position.
+ * @param {import("vscode-languageserver-types").Range} range
+ * @param {import("@codemirror/state").Text} text
+ * @returns {[number, number]}
+ */
+export function lspRangeToCmRange(range, text) {
+  return [
+    lspPositionToCmPosition(range.start, text),
+    lspPositionToCmPosition(range.end, text),
+  ];
+}
+
+/**
  * Convert the diagnostic severity from LSP to CodeMirror.
  * @param {import("vscode-languageserver-types").DiagnosticSeverity | undefined} severity
  * @returns {import("@codemirror/lint").Diagnostic['severity']}
  */
-export function lspSeverityToCmServerity(severity) {
+export function lspSeverityToCmSeverity(severity) {
   switch (severity) {
     case 1:
       return "error";
@@ -121,4 +134,56 @@ export function getValueIfNeedsRefresh({ state, startState }, field) {
   const oldValue = startState.field(field);
   const newValue = state.field(field);
   return oldValue !== newValue ? newValue : undefined;
+}
+
+/**
+ *
+ * @param {import("vscode-languageserver-types").Position} a
+ * @param {import("vscode-languageserver-types").Position} b
+ * @returns {number}
+ */
+export function comparePosition(a, b) {
+  const d = a.line - b.line;
+  return d === 0 ? a.character - b.character : d;
+}
+
+/**
+ *
+ * @param {import("vscode-languageserver-types").Range} a
+ * @param {import("vscode-languageserver-types").Range} b
+ * @returns {number}
+ */
+export function compareRange(a, b) {
+  const d = comparePosition(a.start, b.start);
+  return d === 0 ? comparePosition(a.end, b.end) : d;
+}
+
+/**
+ *
+ * @template T
+ * @param {T[]} array
+ * @param {T} item
+ * @param {(item: T, mid: T) => number} f
+ * @param {number} [first]
+ * @param {number} [last]
+ */
+export function binarySearch(array, item, f, first, last) {
+  let start = first || 0;
+  let end = last || array.length;
+
+  while (start < end) {
+    const mid = start + Math.floor((end - start) / 2);
+    const d = f(item, array[start + mid]);
+    if (d === 0) {
+      return mid;
+    }
+
+    if (d < 0) {
+      end = mid;
+    } else {
+      start = mid;
+    }
+  }
+
+  return start;
 }

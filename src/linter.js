@@ -4,7 +4,7 @@ import { linter } from "@codemirror/lint";
 import { publishDiagnosticsParams } from "./publishDiagnosticsClientCapabilities";
 import {
   lspPositionToCmPosition,
-  lspSeverityToCmServerity,
+  lspSeverityToCmSeverity,
   getValueIfNeedsRefresh,
 } from "./utils";
 
@@ -15,7 +15,7 @@ export const diagnosticLinter = linter(
       return params.diagnostics.map((item) => ({
         from: lspPositionToCmPosition(item.range.start, view.state.doc),
         to: lspPositionToCmPosition(item.range.end, view.state.doc),
-        severity: lspSeverityToCmServerity(item.severity),
+        severity: lspSeverityToCmSeverity(item.severity),
         message: item.message,
       }));
     }
