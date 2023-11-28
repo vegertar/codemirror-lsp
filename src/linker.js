@@ -10,13 +10,13 @@ import {
 } from "./documentLinkClientCapabilities";
 
 /**
- *
- * @param {import("vscode-languageserver-protocol").DocumentLink} a
- * @param {import("vscode-languageserver-protocol").DocumentLink} b
+ * @template {{range: import("vscode-languageserver-types").Range}} T
+ * @param {T} param0
+ * @param {T} param1
  * @returns {number}
  */
-function compareLinkRange(a, b) {
-  return compareRange(a.range, b.range);
+function compareLinkRange({ range: a }, { range: b }) {
+  return compareRange(a, b);
 }
 
 /**
@@ -55,11 +55,11 @@ const documentLinkFacet = Facet.define({
   },
 });
 
-const documentLinkMark = Decoration.mark({});
+const documentLinkMark = Decoration.mark({ class: "cm-linkRange" });
 
 /**
  * @typedef DocumentLinkState
- * @type {{links: import("@codemirror/view").DecorationSet}}
+ * @type {{ranges: import("@codemirror/view").DecorationSet, links: readonly import("vscode-languageserver-protocol").DocumentLink[]}}
  */
 
 /**
@@ -75,15 +75,13 @@ function createDocumentLinkState(links, doc) {
     ),
   );
 
-  return {
-    links: ranges,
-  };
+  return { links, ranges };
 }
 
 export const documentLink = StateField.define({
   /** @returns {DocumentLinkState} */
   create() {
-    return { links: Decoration.none };
+    return { links: [], ranges: Decoration.none };
   },
   update(value, tr) {
     const oldLinks = tr.startState.facet(documentLinkFacet);
@@ -91,24 +89,28 @@ export const documentLink = StateField.define({
     if (oldLinks !== newLinks) {
       value = createDocumentLinkState(newLinks, tr.newDoc);
     } else if (tr.docChanged) {
-      value = { links: value.links.map(tr.changes) };
+      value = { ...value, ranges: value.ranges.map(tr.changes) };
     }
 
     return value;
   },
-  provide() {
-    return documentLinkFacet.computeN(
-      [DocumentLinkProvider.links, DocumentLinkResolver.links],
-      computeNDocumentLinks,
-    );
+  provide(field) {
+    return [
+      documentLinkFacet.computeN(
+        [DocumentLinkProvider.links, DocumentLinkResolver.links],
+        computeNDocumentLinks,
+      ),
+      EditorView.decorations.from(field, (state) => state.ranges),
+    ];
+  },
+});
+
+export const baseTheme = EditorView.baseTheme({
+  ".cm-linkRange": {
+    textDecoration: "underline 1px",
   },
 });
 
 export default function () {
-  return [
-    EditorView.decorations.compute([documentLink], (state) => {
-      console.log(state.field(documentLink));
-      return Decoration.none;
-    }),
-  ];
+  return [documentLink, baseTheme];
 }

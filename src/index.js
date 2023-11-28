@@ -2,6 +2,7 @@
 
 import { EditorView, basicSetup } from "codemirror";
 import { EditorState } from "@codemirror/state";
+import { cpp } from "@codemirror/lang-cpp";
 
 import { serverUri } from "./serverUri";
 import client, { initializeParams } from "./client";
@@ -25,6 +26,7 @@ int main() {
   extensions: [
     basicSetup,
     EditorState.readOnly.of(false),
+    cpp(),
 
     client(),
     trace("verbose"),
