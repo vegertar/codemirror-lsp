@@ -25,7 +25,7 @@ function compareLinkRange({ range: a }, { range: b }) {
  * @returns {import("vscode-languageserver-protocol").DocumentLink[]}
  */
 function computeNDocumentLinks(state) {
-  const links = state.field(DocumentLinkProvider.links);
+  const links = state.field(DocumentLinkProvider.state);
   if (!links) {
     return [];
   }
@@ -33,7 +33,7 @@ function computeNDocumentLinks(state) {
   const result = [...links];
   result.sort(compareLinkRange);
 
-  for (const resolved of state.field(DocumentLinkResolver.links)) {
+  for (const resolved of state.field(DocumentLinkResolver.state)) {
     const i = binarySearch(result, resolved, compareLinkRange);
     const provided = result[i];
     if (!provided || compareLinkRange(resolved, provided) !== 0) {
@@ -97,7 +97,7 @@ export const documentLink = StateField.define({
   provide(field) {
     return [
       documentLinkFacet.computeN(
-        [DocumentLinkProvider.links, DocumentLinkResolver.links],
+        [DocumentLinkProvider.state, DocumentLinkResolver.state],
         computeNDocumentLinks,
       ),
       EditorView.decorations.from(field, (state) => state.ranges),

@@ -14,6 +14,7 @@ import textDocumentSyncClientCapabilities, {
   textDocument,
 } from "./textDocumentSyncClientCapabilities";
 import documentLinkClientCapabilities from "./documentLinkClientCapabilities";
+import documentSymbolClientCapabilities from "./documentSymbolClientCapabilities";
 
 new EditorView({
   doc: String.raw`#include <stdio.h>
@@ -35,6 +36,7 @@ int main() {
     publishDiagnosticsClientCapabilities(),
     textDocumentSyncClientCapabilities(),
     documentLinkClientCapabilities(),
+    documentSymbolClientCapabilities(),
 
     initializeParams.of({
       rootUri: "file:///home/whom/codemirror-lsp/ls/example/c",

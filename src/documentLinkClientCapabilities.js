@@ -5,66 +5,22 @@ import { produce } from "immer";
 import { ViewPlugin } from "@codemirror/view";
 
 import { getConnectionAndInitializeResult, initializeParams } from "./client";
-import { getLastValueFromTransaction, getValueIfNeedsRefresh } from "./utils";
-import {
-  TextDocumentSynchronization,
-  textDocument,
-} from "./textDocumentSyncClientCapabilities";
+import { getValueIfNeedsRefresh } from "./utils";
+import { textDocument } from "./textDocumentSyncClientCapabilities";
+import { providable } from "./providable";
 
-export class DocumentLinkProvider {
-  /** @type {import("@codemirror/state").StateEffectType<import("vscode-languageserver-types").DocumentLink[] | null>} */
-  static effect = StateEffect.define();
-
-  static links = StateField.define({
-    /** @returns {import("vscode-languageserver-types").DocumentLink[] | null} */
-    create() {
-      return null;
-    },
-    update(value, tr) {
-      return (
-        getLastValueFromTransaction(tr, DocumentLinkProvider.effect) || value
-      );
-    },
-  });
-
+export class DocumentLinkProvider extends providable(
+  "textDocument/documentLink",
+) {
   /**
    *
-   * @param {import("vscode-jsonrpc").MessageConnection} c
-   * @param {import("vscode-languageserver-protocol").DocumentLinkParams} params
-   * @returns {Promise<import("vscode-languageserver-types").DocumentLink[] | null>}
-   */
-  async requestDocumentLinks(c, params) {
-    return await c.sendRequest("textDocument/documentLink", params);
-  }
-
-  /**
-   * Implementation of the ViewPlugin update.
    * @param {import("@codemirror/view").ViewUpdate} update
-   * @returns {void}
+   * @returns
    */
-  update(update) {
-    const v = getConnectionAndInitializeResult(update.state);
-    const option = v?.[1]?.capabilities.documentLinkProvider;
-    if (!option) {
-      return;
-    }
-
-    const newVersion = getValueIfNeedsRefresh(
-      update,
-      TextDocumentSynchronization.didVersion,
-    );
-
-    if (newVersion) {
-      this.requestDocumentLinks(v[0], {
-        textDocument: update.state.field(textDocument),
-      })
-        .then((links) =>
-          update.view.dispatch({
-            effects: DocumentLinkProvider.effect.of(links),
-          }),
-        )
-        .catch(console.error);
-    }
+  params(update) {
+    return {
+      textDocument: update.state.field(textDocument),
+    };
   }
 }
 
@@ -77,7 +33,7 @@ export class DocumentLinkResolver {
   /** @type {import("@codemirror/state").StateEffectType<ResolvedDocumentLink>} */
   static effect = StateEffect.define();
 
-  static links = StateField.define({
+  static state = StateField.define({
     /** @returns {ResolvedDocumentLink[]} */
     create() {
       return [];
@@ -121,7 +77,7 @@ export class DocumentLinkResolver {
       return;
     }
 
-    const newLinks = getValueIfNeedsRefresh(update, DocumentLinkProvider.links);
+    const newLinks = getValueIfNeedsRefresh(update, DocumentLinkProvider.state);
     if (newLinks !== undefined) {
       newLinks?.forEach((link) => {
         if (!link.target) {
@@ -142,12 +98,12 @@ export class DocumentLinkResolver {
 }
 
 export const documentLinkProvider = [
-  DocumentLinkProvider.links,
+  DocumentLinkProvider.state,
   ViewPlugin.fromClass(DocumentLinkProvider),
 ];
 
 export const documentLinkResolver = [
-  DocumentLinkResolver.links,
+  DocumentLinkResolver.state,
   ViewPlugin.fromClass(DocumentLinkResolver),
 ];
 
