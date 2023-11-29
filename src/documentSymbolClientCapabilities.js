@@ -8,7 +8,7 @@ import { textDocument } from "./textDocumentSyncClientCapabilities";
 
 export class DocumentSymbolProvider extends providable(
   "textDocument/documentSymbol",
-  (response) => response || null,
+  (r) => r || null,
 ) {
   /**
    *

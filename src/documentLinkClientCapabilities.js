@@ -15,7 +15,6 @@ import { providable } from "./providable";
 
 class BaseDocumentLinkProvider extends providable(
   "textDocument/documentLink",
-  /** @type {(r?: import("./providable").LinkResponse) => r | null} */
   (r) => r || null,
 ) {}
 
