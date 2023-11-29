@@ -13,65 +13,75 @@ const providableCapabilities = /** @type {const} */ ({
 });
 
 /**
+ * @typedef LinkRequest
+ * @type {import("vscode-languageserver-protocol").DocumentLinkParams}
+ */
+
+/**
+ * @typedef LinkResponse
+ * @type {import("vscode-languageserver-types").DocumentLink[] | null}
+ */
+
+/**
+ * @typedef LinkResolveRequest
+ * @type {import("vscode-languageserver-protocol").DocumentLink}
+ */
+
+/**
+ * @typedef LinkResolveResponse
+ * @type {import("vscode-languageserver-types").DocumentLink}
+ */
+
+/**
+ * @typedef SymbolRequest
+ * @type {import("vscode-languageserver-protocol").DocumentSymbolParams}
+ */
+
+/**
+ * @typedef SymbolResponse
+ * @type {import("vscode-languageserver-types").DocumentSymbol[] | import("vscode-languageserver-types").SymbolInformation[] | null}
+ */
+
+/**
+ * @typedef {T extends "textDocument/documentLink" ? LinkRequest :
+ * T extends "documentLink/resolve" ? LinkResolveRequest :
+ * T extends "textDocument/documentSymbol" ? SymbolRequest : never} ProvidableRequest<T>
+ * @template T
+ */
+
+/**
+ * @typedef {T extends "textDocument/documentLink" ? LinkResponse :
+ * T extends "documentLink/resolve" ? LinkResolveResponse :
+ * T extends "textDocument/documentSymbol" ? SymbolResponse : never} ProvidableResponse<T>
+ * @template T
+ */
+
+/**
+ * @typedef {((this: import("@codemirror/state").EditorState, response?: ProvidableResponse<T>) => U)} StateCreate<T, U>
+ * @template T, U
+ */
+
+/**
+ * @typedef {((value: U, transaction: import("@codemirror/state").Transaction) => U)} StateUpdate<U>
+ * @template U
+ */
+
+/**
  * @template {keyof typeof providableCapabilities} T
  * @template U
  * @param {T} method
- * @param {((this: import("@codemirror/state").EditorState, response?: ProvidableResponse) => U)} stateCreate
- * @param {((value: U, transaction: import("@codemirror/state").Transaction) => U)} [stateUpdate]
+ * @param {StateCreate<T, U>} stateCreate
+ * @param {StateUpdate<U>} [stateUpdate]
  * @returns
  */
 export function providable(method, stateCreate, stateUpdate) {
-  /**
-   * @typedef LinkRequest
-   * @type {import("vscode-languageserver-protocol").DocumentLinkParams}
-   */
-
-  /**
-   * @typedef LinkResponse
-   * @type {import("vscode-languageserver-types").DocumentLink[] | null}
-   */
-
-  /**
-   * @typedef LinkResolveRequest
-   * @type {import("vscode-languageserver-protocol").DocumentLink}
-   */
-
-  /**
-   * @typedef LinkResolveResponse
-   * @type {import("vscode-languageserver-types").DocumentLink}
-   */
-
-  /**
-   * @typedef SymbolRequest
-   * @type {import("vscode-languageserver-protocol").DocumentSymbolParams}
-   */
-
-  /**
-   * @typedef SymbolResponse
-   * @type {import("vscode-languageserver-types").DocumentSymbol[] | import("vscode-languageserver-types").SymbolInformation[] | null}
-   */
-
-  /**
-   * @typedef ProvidableRequest
-   * @type {T extends "textDocument/documentLink" ? LinkRequest :
-   * T extends "documentLink/resolve" ? LinkResolveRequest :
-   * T extends "textDocument/documentSymbol" ? SymbolRequest : never}
-   */
-
-  /**
-   * @typedef ProvidableResponse
-   * @type {T extends "textDocument/documentLink" ? LinkResponse :
-   * T extends "documentLink/resolve" ? LinkResolveResponse :
-   * T extends "textDocument/documentSymbol" ? SymbolResponse : never}
-   */
-
   const provider = providableCapabilities[method];
   return class Provider {
-    /** @type {import("@codemirror/state").StateEffectType<ProvidableResponse>} */
+    /** @type {import("@codemirror/state").StateEffectType<ProvidableResponse<T>>} */
     static effect = StateEffect.define();
 
+    /** @type {import("@codemirror/state").StateField<U>} */
     static state = StateField.define({
-      /** @returns {U} */
       create(state) {
         return stateCreate.call(state);
       },
@@ -89,8 +99,8 @@ export function providable(method, stateCreate, stateUpdate) {
     /**
      *
      * @param {import("vscode-jsonrpc").MessageConnection} c
-     * @param {ProvidableRequest} params
-     * @returns {Promise<ProvidableResponse>}
+     * @param {ProvidableRequest<T>} params
+     * @returns {Promise<ProvidableResponse<T>>}
      */
     sendRequest(c, params) {
       return c.sendRequest(method, params);
@@ -99,8 +109,7 @@ export function providable(method, stateCreate, stateUpdate) {
     /**
      *
      * @param {import("@codemirror/view").ViewUpdate} update
-     * @abstract
-     * @returns {ProvidableRequest}
+     * @returns {ProvidableRequest<T>}
      */
     params(update) {
       void update;
@@ -133,11 +142,11 @@ export function providable(method, stateCreate, stateUpdate) {
     /**
      *
      * @param {import("@codemirror/view").ViewUpdate} update
-     * @param {ProvidableResponse} result
+     * @param {ProvidableResponse<T>} response
      */
-    dispatch(update, result) {
+    dispatch(update, response) {
       update.view.dispatch({
-        effects: Provider.effect.of(result),
+        effects: Provider.effect.of(response),
       });
     }
 

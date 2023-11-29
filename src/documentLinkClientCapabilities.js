@@ -8,15 +8,16 @@ import { getValueIfNeedsRefresh } from "./utils";
 import { textDocument } from "./textDocumentSyncClientCapabilities";
 import { providable } from "./providable";
 
-class BaseDocumentLinkProvider extends providable(
-  "textDocument/documentLink",
-  (response) => response || null,
-) {}
-
 /**
  * @typedef Link
  * @type {import("vscode-languageserver-types").DocumentLink}
  */
+
+class BaseDocumentLinkProvider extends providable(
+  "textDocument/documentLink",
+  /** @type {(r?: import("./providable").LinkResponse) => r | null} */
+  (r) => r || null,
+) {}
 
 class BaseDocumentLinkResolver extends providable(
   "documentLink/resolve",
@@ -43,7 +44,7 @@ export class DocumentLinkProvider extends BaseDocumentLinkProvider {
 }
 
 export class DocumentLinkResolver extends BaseDocumentLinkResolver {
-  /** @type {Link[] | undefined} */
+  /** @type {Link[] | null | undefined} */
   links;
 
   /** @type {BaseDocumentLinkResolver['isCapable']} */
@@ -55,7 +56,7 @@ export class DocumentLinkResolver extends BaseDocumentLinkResolver {
   needsRefresh(update) {
     const links = getValueIfNeedsRefresh(
       update,
-      BaseDocumentLinkResolver.state,
+      BaseDocumentLinkProvider.state,
     );
     this.links = links;
     return !!links;
