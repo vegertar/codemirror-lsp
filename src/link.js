@@ -1,13 +1,13 @@
 // @ts-check
 
 import { Facet, StateField } from "@codemirror/state";
-import { Decoration, EditorView } from "@codemirror/view";
+import { hoverTooltip, Decoration, EditorView } from "@codemirror/view";
 
-import { binarySearch, compareRange, lspRangeToCmRange } from "./utils";
 import {
   DocumentLinkProvider,
   DocumentLinkResolver,
 } from "./documentLinkClientCapabilities";
+import { binarySearch, compareRange, lspRangeToCmRange } from "./utils";
 
 /**
  * @template {{range: import("vscode-languageserver-types").Range}} T
@@ -55,11 +55,9 @@ const documentLinkFacet = Facet.define({
   },
 });
 
-const documentLinkMark = Decoration.mark({ class: "cm-linkRange" });
-
 /**
  * @typedef DocumentLinkState
- * @type {{ranges: import("@codemirror/view").DecorationSet, links: readonly import("vscode-languageserver-protocol").DocumentLink[]}}
+ * @type {{decorations: import("@codemirror/view").DecorationSet, links: readonly import("vscode-languageserver-protocol").DocumentLink[]}}
  */
 
 /**
@@ -69,19 +67,62 @@ const documentLinkMark = Decoration.mark({ class: "cm-linkRange" });
  * @returns {DocumentLinkState}
  */
 function createDocumentLinkState(links, doc) {
-  const ranges = Decoration.set(
-    links.map((link) =>
-      documentLinkMark.range(...lspRangeToCmRange(link.range, doc)),
+  const decorations = Decoration.set(
+    links.map((link, i) =>
+      Decoration.mark({ class: "cm-linkRange", i }).range(
+        ...lspRangeToCmRange(link.range, doc),
+      ),
     ),
   );
 
-  return { links, ranges };
+  return { links, decorations };
+}
+
+/**
+ * @this {import("@codemirror/view").EditorView}
+ * @param {import("vscode-languageserver-protocol").DocumentLink} link
+ * @returns {import("@codemirror/view").TooltipView}
+ */
+function createDocumentLinkTooltipView(link) {
+  const dom = document.createElement("div");
+  dom.textContent = link.target || null;
+  return { dom };
+}
+
+/**
+ *
+ * @param {import("@codemirror/state").StateField<DocumentLinkState>} field
+ */
+function createDocumentLinkTooltip(field) {
+  return hoverTooltip((view, pos) => {
+    const { links, decorations } = view.state.field(field);
+    let start = 0,
+      end = 0,
+      i = -1;
+    decorations.between(pos, pos, (from, to, { spec }) => {
+      start = from;
+      end = to;
+      i = spec.i;
+      return false;
+    });
+
+    if (i === -1) {
+      return null;
+    }
+
+    return {
+      pos: start,
+      end,
+      above: true,
+      create: (view) => createDocumentLinkTooltipView.call(view, links[i]),
+    };
+  });
 }
 
 export const documentLink = StateField.define({
   /** @returns {DocumentLinkState} */
   create() {
-    return { links: [], ranges: Decoration.none };
+    return { links: [], decorations: Decoration.none };
   },
   update(value, tr) {
     const oldLinks = tr.startState.facet(documentLinkFacet);
@@ -89,7 +130,7 @@ export const documentLink = StateField.define({
     if (oldLinks !== newLinks) {
       value = createDocumentLinkState(newLinks, tr.newDoc);
     } else if (tr.docChanged) {
-      value = { ...value, ranges: value.ranges.map(tr.changes) };
+      value = { ...value, decorations: value.decorations.map(tr.changes) };
     }
 
     return value;
@@ -100,7 +141,8 @@ export const documentLink = StateField.define({
         [DocumentLinkProvider.state, DocumentLinkResolver.state],
         computeNDocumentLinks,
       ),
-      EditorView.decorations.from(field, (state) => state.ranges),
+      EditorView.decorations.from(field, (state) => state.decorations),
+      createDocumentLinkTooltip(field),
     ];
   },
 });

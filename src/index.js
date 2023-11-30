@@ -4,11 +4,12 @@ import { EditorView, basicSetup } from "codemirror";
 import { EditorState } from "@codemirror/state";
 import { cpp } from "@codemirror/lang-cpp";
 
+import lint from "./lint";
+import link from "./link";
+
 import { serverUri } from "./serverUri";
 import client, { initializeParams } from "./client";
 import trace from "./trace";
-import linter from "./linter";
-import linker from "./linker";
 import publishDiagnosticsClientCapabilities from "./publishDiagnosticsClientCapabilities";
 import textDocumentSyncClientCapabilities, {
   textDocument,
@@ -29,15 +30,19 @@ int main() {
     EditorState.readOnly.of(false),
     cpp(),
 
+    // UI based on LSP
+    lint(),
+    link(),
+
+    // LSP implementations
     client(),
     trace("verbose"),
-    linter(),
-    linker(),
     publishDiagnosticsClientCapabilities(),
     textDocumentSyncClientCapabilities(),
     documentLinkClientCapabilities(),
     documentSymbolClientCapabilities(),
 
+    // LSP configurations
     initializeParams.of({
       rootUri: "file:///home/whom/codemirror-lsp/ls/example/c",
     }),

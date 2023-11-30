@@ -8,7 +8,7 @@ import {
   getValueIfNeedsRefresh,
 } from "./utils";
 
-export const diagnosticLinter = linter(
+export const diagnosticLint = linter(
   (view) => {
     const params = view.state.field(publishDiagnosticsParams);
     if (params) {
@@ -32,5 +32,5 @@ export const diagnosticLinter = linter(
 );
 
 export default function () {
-  return [diagnosticLinter];
+  return [diagnosticLint];
 }
