@@ -6,6 +6,7 @@ import { cpp } from "@codemirror/lang-cpp";
 
 import lint from "./lint";
 import link from "./link";
+import jump from "./jump";
 
 import { serverUri } from "./serverUri";
 import client, { initializeParams } from "./client";
@@ -27,12 +28,13 @@ int main() {
 }`,
   extensions: [
     basicSetup,
-    EditorState.readOnly.of(false),
+    EditorState.readOnly.of(true),
     cpp(),
 
     // UI based on LSP
     lint(),
     link(),
+    jump(),
 
     // LSP implementations
     client(),

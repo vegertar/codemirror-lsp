@@ -1,6 +1,6 @@
 // @ts-check
 
-import { Facet, StateField } from "@codemirror/state";
+import { Facet, StateField, StateEffect } from "@codemirror/state";
 import { hoverTooltip, Decoration, EditorView } from "@codemirror/view";
 
 import {
@@ -10,59 +10,31 @@ import {
 import { binarySearch, compareRange, lspRangeToCmRange } from "./utils";
 
 /**
- * @template {{range: import("vscode-languageserver-types").Range}} T
- * @param {T} param0
- * @param {T} param1
- * @returns {number}
+ * @typedef {import("vscode-languageserver-protocol").DocumentLink} DocumentLink
  */
-function compareLinkRange({ range: a }, { range: b }) {
-  return compareRange(a, b);
-}
 
 /**
- *
- * @param {import("@codemirror/state").EditorState} state
- * @returns {import("vscode-languageserver-protocol").DocumentLink[]}
+ * @typedef DocumentLinkFollowState
+ * @type {{
+ *   start: number,
+ *   end: number,
+ *   link: DocumentLink,
+ *   pos: number,
+ * }}
  */
-function computeNDocumentLinks(state) {
-  const links = state.field(DocumentLinkProvider.state);
-  if (!links) {
-    return [];
-  }
-
-  const result = [...links];
-  result.sort(compareLinkRange);
-
-  for (const resolved of state.field(DocumentLinkResolver.state)) {
-    const i = binarySearch(result, resolved, compareLinkRange);
-    const provided = result[i];
-    if (!provided || compareLinkRange(resolved, provided) !== 0) {
-      const { start, end } = resolved.range;
-      throw new Error(
-        `The resolved link is unknown: .range(${start.line}:${start.character}, ${end.line}:${end.character} .target(${resolved.target})`,
-      );
-    }
-    result[i] = resolved;
-  }
-
-  return result;
-}
-
-/** @type {import("@codemirror/state").Facet<import("vscode-languageserver-protocol").DocumentLink>} */
-const documentLinkFacet = Facet.define({
-  compareInput(a, b) {
-    return a.target === b.target && compareLinkRange(a, b) === 0;
-  },
-});
 
 /**
  * @typedef DocumentLinkState
- * @type {{decorations: import("@codemirror/view").DecorationSet, links: readonly import("vscode-languageserver-protocol").DocumentLink[]}}
+ * @type {{
+ *   decorations: import("@codemirror/view").DecorationSet,
+ *   links: readonly DocumentLink[],
+ *   find: (pos: number, side?: -1 | 1) => null | DocumentLinkFollowState,
+ * }}
  */
 
 /**
  *
- * @param {readonly import("vscode-languageserver-protocol").DocumentLink[]} links
+ * @param {readonly DocumentLink[]} links
  * @param {import("@codemirror/state").Text} doc
  * @returns {DocumentLinkState}
  */
@@ -75,18 +47,84 @@ function createDocumentLinkState(links, doc) {
     ),
   );
 
-  return { links, decorations };
+  return {
+    links,
+    decorations,
+    find(pos) {
+      let start = 0,
+        end = 0,
+        i = -1;
+
+      this.decorations.between(pos, pos, (from, to, { spec }) => {
+        start = from;
+        end = to;
+        i = spec.i;
+        return false;
+      });
+
+      return i === -1 ? null : { link: this.links[i], start, end, pos };
+    },
+  };
 }
 
 /**
- * @this {import("@codemirror/view").EditorView}
- * @param {import("vscode-languageserver-protocol").DocumentLink} link
- * @returns {import("@codemirror/view").TooltipView}
+ * @template {{range: import("vscode-languageserver-types").Range}} T
+ * @param {T} param0
+ * @param {T} param1
+ * @returns {number}
  */
-function createDocumentLinkTooltipView(link) {
-  const dom = document.createElement("div");
-  dom.textContent = link.target || null;
-  return { dom };
+function compareLinkRange({ range: a }, { range: b }) {
+  return compareRange(a, b);
+}
+
+/** @type {import("@codemirror/state").Facet<DocumentLink>} */
+const documentLinkFacet = Facet.define({
+  compareInput(a, b) {
+    return a.target === b.target && compareLinkRange(a, b) === 0;
+  },
+});
+
+/** @type {import("@codemirror/state").StateEffectType<DocumentLinkFollowState>} */
+const documentLinkFollowEffect = StateEffect.define();
+
+function createDocumentLinkCollection() {
+  return documentLinkFacet.computeN(
+    [DocumentLinkProvider.state, DocumentLinkResolver.state],
+    (state) => {
+      const links = state.field(DocumentLinkProvider.state);
+      if (!links) {
+        return [];
+      }
+
+      const result = [...links];
+      result.sort(compareLinkRange);
+
+      for (const resolved of state.field(DocumentLinkResolver.state)) {
+        const i = binarySearch(result, resolved, compareLinkRange);
+        const provided = result[i];
+        if (!provided || compareLinkRange(resolved, provided) !== 0) {
+          const { start, end } = resolved.range;
+          throw new Error(
+            `The resolved link is unknown: .range(${start.line}:${start.character}, ${end.line}:${end.character} .target(${resolved.target})`,
+          );
+        }
+        result[i] = resolved;
+      }
+
+      return result;
+    },
+  );
+}
+
+/**
+ *
+ * @param {import("@codemirror/state").StateField<DocumentLinkState>} field
+ */
+function createDocumentLinkDecorations(field) {
+  return EditorView.decorations.from(
+    field,
+    (state) => state?.decorations || Decoration.none,
+  );
 }
 
 /**
@@ -94,35 +132,58 @@ function createDocumentLinkTooltipView(link) {
  * @param {import("@codemirror/state").StateField<DocumentLinkState>} field
  */
 function createDocumentLinkTooltip(field) {
+  /**
+   * @this {import("@codemirror/view").EditorView}
+   * @param {DocumentLink} link
+   * @returns {import("@codemirror/view").TooltipView}
+   */
+  function createView(link) {
+    const dom = document.createElement("div");
+    dom.textContent = link.target || null;
+    return { dom };
+  }
+
   return hoverTooltip((view, pos) => {
-    const { links, decorations } = view.state.field(field);
-    let start = 0,
-      end = 0,
-      i = -1;
-    decorations.between(pos, pos, (from, to, { spec }) => {
-      start = from;
-      end = to;
-      i = spec.i;
-      return false;
-    });
+    const result = view.state.field(field).find(pos);
+    return result
+      ? {
+          pos: result.start,
+          end: result.end,
+          above: true,
+          create: (view) => createView.call(view, result.link),
+        }
+      : null;
+  });
+}
 
-    if (i === -1) {
-      return null;
-    }
+/**
+ *
+ * @param {import("@codemirror/state").StateField<DocumentLinkState>} field
+ */
+function createDocumentLinkEventHandler(field) {
+  return EditorView.domEventHandlers({
+    click({ ctrlKey, clientX: x, clientY: y }, view) {
+      if (!ctrlKey) {
+        return;
+      }
+      const pos = view.posAtCoords({ x, y });
+      if (!pos) {
+        return;
+      }
 
-    return {
-      pos: start,
-      end,
-      above: true,
-      create: (view) => createDocumentLinkTooltipView.call(view, links[i]),
-    };
+      const result = view.state.field(field)?.find(pos);
+      if (result) {
+        view.dispatch({ effects: documentLinkFollowEffect.of(result) });
+        return true;
+      }
+    },
   });
 }
 
 export const documentLink = StateField.define({
   /** @returns {DocumentLinkState} */
-  create() {
-    return { links: [], decorations: Decoration.none };
+  create(state) {
+    return createDocumentLinkState([], state.doc);
   },
   update(value, tr) {
     const oldLinks = tr.startState.facet(documentLinkFacet);
@@ -137,12 +198,10 @@ export const documentLink = StateField.define({
   },
   provide(field) {
     return [
-      documentLinkFacet.computeN(
-        [DocumentLinkProvider.state, DocumentLinkResolver.state],
-        computeNDocumentLinks,
-      ),
-      EditorView.decorations.from(field, (state) => state.decorations),
+      createDocumentLinkCollection(),
+      createDocumentLinkDecorations(field),
       createDocumentLinkTooltip(field),
+      createDocumentLinkEventHandler(field),
     ];
   },
 });

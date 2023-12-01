@@ -191,25 +191,25 @@ export class BeforeHandshake {
 }
 
 /**
- * The initialize is defined as a ViewPlugin to perform the LSP handshake
- * whenever it detects a transaction of the new connection.
+ * The handshake is defined as a ViewPlugin to perform the LSP handshake
+ * whenever it detects a new connection.
  */
-export const initialize = ViewPlugin.define(() => {
+export const handshake = ViewPlugin.define(() => {
   let busy = false;
 
   return {
-    update(update) {
-      const v = getConnectionAndInitializeResult(update.state);
+    update({ state, view }) {
+      const v = getConnectionAndInitializeResult(state);
 
       if (v && !v[1] && !busy) {
         busy = true;
         const c = v[0];
 
         c.listen();
-        update.state.facet(BeforeHandshake.promise).finally(() =>
-          performHandshake(c, update.state.facet(initializeParams), {})
+        state.facet(BeforeHandshake.promise).finally(() =>
+          performHandshake(c, state.facet(initializeParams), {})
             .then((result) => {
-              update.view.dispatch({
+              view.dispatch({
                 effects: initializeResultEffect.of([c, result]),
               });
             })
@@ -229,7 +229,7 @@ export default function () {
   return [
     socket,
     connection,
-    initialize,
+    handshake,
     initializeResult,
     initializeParams.of({
       processId: null,
