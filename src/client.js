@@ -30,7 +30,7 @@ export const connection = StateField.define({
 
 /**
  * The socket is defined as a ViewPlugin in which the owned network handler
- * is independent of eiditing transactions, as redo/undo operations typically
+ * is independent of editing transactions, as redo/undo operations typically
  * do not affect network states.
  */
 export const socket = ViewPlugin.define((view) => {
@@ -61,7 +61,7 @@ export const initializeParams = Facet.define({
 
 /**
  * An effect to notify the handshake is finished.
- * @type {import("@codemirror/state").StateEffectType<import("vscode-languageserver-protocol").InitializeResult>}
+ * @type {import("@codemirror/state").StateEffectType<[import("vscode-jsonrpc").MessageConnection, import("vscode-languageserver-protocol").InitializeResult]>}
  */
 export const initializeResultEffect = StateEffect.define();
 
@@ -71,11 +71,18 @@ export const initializeResult = StateField.define({
     return null;
   },
   update(value, tr) {
-    // Reset if appeared a new connection
-    if (getLastValueFromTransaction(tr, connectionEffect)) {
-      return null;
+    const c = tr.state.field(connection);
+    for (const effect of tr.effects) {
+      // Reset if appeared a new connection
+      if (effect.is(connectionEffect)) {
+        return null;
+      }
+      if (effect.is(initializeResultEffect) && c === effect.value[0]) {
+        return effect.value[1];
+      }
     }
-    return getLastValueFromTransaction(tr, initializeResultEffect) || value;
+
+    return value;
   },
 });
 
@@ -196,13 +203,14 @@ export const initialize = ViewPlugin.define(() => {
 
       if (v && !v[1] && !busy) {
         busy = true;
+        const c = v[0];
 
-        v[0].listen();
+        c.listen();
         update.state.facet(BeforeHandshake.promise).finally(() =>
-          performHandshake(v[0], update.state.facet(initializeParams), {})
+          performHandshake(c, update.state.facet(initializeParams), {})
             .then((result) => {
               update.view.dispatch({
-                effects: initializeResultEffect.of(result),
+                effects: initializeResultEffect.of([c, result]),
               });
             })
             .catch((err) => {
