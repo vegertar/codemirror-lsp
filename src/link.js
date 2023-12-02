@@ -1,6 +1,6 @@
 // @ts-check
 
-import { Facet, StateField, StateEffect } from "@codemirror/state";
+import { EditorState, Facet, StateField, StateEffect } from "@codemirror/state";
 import { hoverTooltip, Decoration, EditorView } from "@codemirror/view";
 
 import {
@@ -8,13 +8,14 @@ import {
   DocumentLinkResolver,
 } from "./documentLinkClientCapabilities";
 import { binarySearch, compareRange, lspRangeToCmRange } from "./utils";
+import { fileOpenEffect } from "./file";
 
 /**
  * @typedef {import("vscode-languageserver-protocol").DocumentLink} DocumentLink
  */
 
 /**
- * @typedef DocumentLinkFollowState
+ * @typedef DocumentLinkStateDetail
  * @type {{
  *   start: number,
  *   end: number,
@@ -28,7 +29,7 @@ import { binarySearch, compareRange, lspRangeToCmRange } from "./utils";
  * @type {{
  *   decorations: import("@codemirror/view").DecorationSet,
  *   links: readonly DocumentLink[],
- *   find: (pos: number, side?: -1 | 1) => null | DocumentLinkFollowState,
+ *   find: (pos: number, side?: -1 | 1) => null | DocumentLinkStateDetail,
  * }}
  */
 
@@ -84,13 +85,14 @@ const documentLinkFacet = Facet.define({
   },
 });
 
-/** @type {import("@codemirror/state").StateEffectType<DocumentLinkFollowState>} */
+/** @type {import("@codemirror/state").StateEffectType<DocumentLinkStateDetail>} */
 const documentLinkFollowEffect = StateEffect.define();
 
 function createDocumentLinkCollection() {
   return documentLinkFacet.computeN(
     [DocumentLinkProvider.state, DocumentLinkResolver.state],
     (state) => {
+      /** @type {DocumentLink[] | null} */
       const links = state.field(DocumentLinkProvider.state);
       if (!links) {
         return [];
@@ -206,6 +208,18 @@ export const documentLink = StateField.define({
   },
 });
 
+export const followLink = EditorState.transactionExtender.of((tr) => {
+  const effects = [];
+
+  for (const effect of tr.effects) {
+    if (effect.is(documentLinkFollowEffect) && effect.value.link.target) {
+      effects.push(fileOpenEffect.of(effect.value.link.target));
+    }
+  }
+
+  return effects.length ? { effects } : null;
+});
+
 export const baseTheme = EditorView.baseTheme({
   ".cm-linkRange": {
     textDecoration: "underline 1px",
@@ -213,5 +227,5 @@ export const baseTheme = EditorView.baseTheme({
 });
 
 export default function () {
-  return [documentLink, baseTheme];
+  return [documentLink, followLink, baseTheme];
 }

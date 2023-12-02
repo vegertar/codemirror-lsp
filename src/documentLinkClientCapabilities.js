@@ -34,6 +34,8 @@ class BaseDocumentLinkResolver extends providable(
 ) {}
 
 export class DocumentLinkProvider extends BaseDocumentLinkProvider {
+  refreshAfterSynchronization = true;
+
   /** @type {BaseDocumentLinkProvider['params']} */
   params(update) {
     return {

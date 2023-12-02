@@ -2,8 +2,8 @@
 
 import { StateField, StateEffect } from "@codemirror/state";
 
-import { getConnectionAndInitializeResult } from "./client";
 import { getLastValueFromTransaction, getValueIfNeedsRefresh } from "./utils";
+import { getConnectionAndInitializeResult, initializeResult } from "./client";
 import { TextDocumentSynchronization } from "./textDocumentSyncClientCapabilities";
 
 const providableCapabilities = /** @type {const} */ ({
@@ -96,6 +96,9 @@ export function providable(method, stateCreate, stateUpdate) {
       },
     });
 
+    refreshAfterHandshake = false;
+    refreshAfterSynchronization = false;
+
     /**
      *
      * @param {import("vscode-jsonrpc").MessageConnection} c
@@ -122,10 +125,25 @@ export function providable(method, stateCreate, stateUpdate) {
      * @returns {boolean}
      */
     needsRefresh(update) {
-      return !!getValueIfNeedsRefresh(
-        update,
-        TextDocumentSynchronization.didVersion,
-      );
+      if (
+        this.refreshAfterHandshake &&
+        !!getValueIfNeedsRefresh(update, initializeResult)
+      ) {
+        return true;
+      }
+
+      if (
+        this.refreshAfterSynchronization &&
+        !!getValueIfNeedsRefresh(
+          update,
+          TextDocumentSynchronization.didVersion,
+          false, // Allow the server’s ability to fulfill requests to be independent of TextDocumentSynchronization.
+        )
+      ) {
+        return true;
+      }
+
+      return false;
     }
 
     /**

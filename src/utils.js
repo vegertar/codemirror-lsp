@@ -123,16 +123,23 @@ export function lspSeverityToCmSeverity(severity) {
 }
 
 /**
+ * @typedef {import("@codemirror/state").StateField<T extends undefined ? never : T>} NonUndefinedStateField<T>
+ * @template T
+ */
+
+/**
  * Examine if a refresh is needed by comparing the provided state field's old and new values.
  * The new value is returned if true.
  * @template T
  * @param {{state: import("@codemirror/state").EditorState, startState: import("@codemirror/state").EditorState}} param0
- * @param {import("@codemirror/state").StateField<T extends undefined ? never : T>} field
+ * @param {[NonUndefinedStateField<T>] | [NonUndefinedStateField<T>, false]} args
  * @returns {T | undefined}
  */
-export function getValueIfNeedsRefresh({ state, startState }, field) {
-  const oldValue = startState.field(field);
-  const newValue = state.field(field);
+export function getValueIfNeedsRefresh({ state, startState }, ...args) {
+  // @ts-ignore
+  const oldValue = startState.field(...args);
+  // @ts-ignore
+  const newValue = state.field(...args);
   return oldValue !== newValue ? newValue : undefined;
 }
 

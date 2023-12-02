@@ -1,4 +1,5 @@
 /* eslint-env node */
+
 module.exports = {
   devServer: {
     proxy: {
@@ -7,5 +8,11 @@ module.exports = {
         ws: true,
       },
     },
+    static: [
+      {
+        directory: "/usr/include",
+        publicPath: "/usr/include",
+      },
+    ],
   },
 };

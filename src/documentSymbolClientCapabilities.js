@@ -10,6 +10,8 @@ export class DocumentSymbolProvider extends providable(
   "textDocument/documentSymbol",
   (r) => r || null,
 ) {
+  refreshAfterSynchronization = true;
+
   /**
    *
    * @param {import("@codemirror/view").ViewUpdate} update
