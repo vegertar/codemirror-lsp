@@ -14,5 +14,14 @@ module.exports = {
         publicPath: "/usr/include",
       },
     ],
+    onAfterSetupMiddleware: function (devServer) {
+      if (!devServer) {
+        throw new Error("webpack-dev-server is not defined");
+      }
+
+      devServer.app.get("/navi/*", function (req, res) {
+        res.sendFile(__dirname.concat("/dist/index.html"));
+      });
+    },
   },
 };

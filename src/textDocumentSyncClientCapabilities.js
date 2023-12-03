@@ -115,7 +115,9 @@ export class TextDocumentSynchronization {
    */
   didClose(c, params) {
     if (this.pendingChanges.length) {
-      console.error(`There are ${this.pendingChanges.length} pending changes`);
+      throw new Error(
+        `TODO: Notify the user that there are ${this.pendingChanges.length} pending changes. The file cannot be closed until these changes are synced.`,
+      );
     }
 
     this.didState = 4;

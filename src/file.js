@@ -19,6 +19,8 @@ export const fileOpenEffect = StateEffect.define();
 /** @type {import("@codemirror/state").StateEffectType<FileInfo['languageId']>} */
 export const fileChangeLanguageEffect = StateEffect.define();
 
+export const fileLoadEffect = StateEffect.define();
+
 /** @type {import("@codemirror/state").StateField<FileInfo>} */
 export const fileInfo = StateField.define({
   create() {
@@ -63,6 +65,7 @@ export const fileLoader = ViewPlugin.define(() => {
       if (oldFileInfo.uri !== newFileInfo.uri) {
         openFile(newFileInfo.uri).then((text) => {
           update.view.dispatch({
+            effects: fileLoadEffect.of(null),
             changes: {
               from: 0,
               to: update.state.doc.length,

@@ -208,16 +208,19 @@ export const documentLink = StateField.define({
   },
 });
 
-export const followLink = EditorState.transactionExtender.of((tr) => {
-  const effects = [];
+export const followLink = EditorState.transactionFilter.of((tr) => {
+  /** @type {import("@codemirror/state").TransactionSpec[]} */
+  const transactions = [tr];
 
   for (const effect of tr.effects) {
     if (effect.is(documentLinkFollowEffect) && effect.value.link.target) {
-      effects.push(fileOpenEffect.of(effect.value.link.target));
+      transactions.push({
+        effects: fileOpenEffect.of(effect.value.link.target),
+      });
     }
   }
 
-  return effects.length ? { effects } : null;
+  return transactions;
 });
 
 export const baseTheme = EditorView.baseTheme({
