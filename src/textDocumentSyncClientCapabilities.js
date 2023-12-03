@@ -73,7 +73,10 @@ export class TextDocumentSynchronization {
 
   /** @type {0 | 1 | 2 | 3 | 4} 0: closed, 1: opening, 2: open, 3: changing, 4: closing */
   didState = 0;
-  didUri = "";
+  /** @type {TextDocument | null} */
+  didTextDocument = null;
+  /** @type {0 | 1 | 2} 0: nop, 1: prepare to reset, 3: resetting */
+  didReset = 0;
 
   /** @type {import("vscode-languageserver-protocol").TextDocumentSyncOptions} */
   syncOption = {};
@@ -99,7 +102,7 @@ export class TextDocumentSynchronization {
    */
   didOpen(c, params) {
     this.didState = 1;
-    this.didUri = params.textDocument.uri;
+    this.didTextDocument = params.textDocument;
     c.sendNotification("textDocument/didOpen", params).then(() => {
       this.didState = 2;
       this.did(params.textDocument.version);
@@ -116,9 +119,8 @@ export class TextDocumentSynchronization {
     }
 
     this.didState = 4;
-    this.didUri = params.textDocument.uri;
     c.sendNotification("textDocument/didClose", params).then(() => {
-      this.didState = 0;
+      this.reset();
       this.did(0);
     });
   }
@@ -129,7 +131,6 @@ export class TextDocumentSynchronization {
    */
   didChange(c, params) {
     this.didState = 3;
-    this.didUri = params.textDocument.uri;
     c.sendNotification("textDocument/didChange", params).then(() => {
       this.didState = 2;
       this.did(params.textDocument.version);
@@ -156,23 +157,34 @@ export class TextDocumentSynchronization {
 
   reset() {
     this.didState = 0;
-    this.didUri = "";
+    this.didTextDocument = null;
+    this.didReset = 0;
     this.syncOption = {};
     this.pendingChanges.length = 0;
   }
 
   /**
    *
-   * @param {TextDocument} oldTextDocument
    * @param {TextDocument} newTextDocument
    * @param {import("vscode-jsonrpc").MessageConnection} c
    */
-  checkReOpen(oldTextDocument, newTextDocument, c) {
+  checkReset(newTextDocument, c) {
+    if (!this.didTextDocument) {
+      return;
+    }
+
+    // By the specification, it's required to close the old document first.
     if (
-      oldTextDocument.uri !== newTextDocument.uri ||
-      oldTextDocument.languageId !== newTextDocument.languageId
+      this.didReset === 0 &&
+      (this.didTextDocument.uri !== newTextDocument.uri ||
+        this.didTextDocument.languageId !== newTextDocument.languageId)
     ) {
-      this.didClose(c, { textDocument: oldTextDocument });
+      this.didReset = 1;
+    }
+
+    if (this.didState === 2 && this.didReset === 1) {
+      this.didReset = 2;
+      this.didClose(c, { textDocument: this.didTextDocument });
     }
   }
 
@@ -194,7 +206,7 @@ export class TextDocumentSynchronization {
     }
 
     if (this.syncOption.openClose) {
-      return this.didOpen(c, {
+      this.didOpen(c, {
         textDocument: {
           ...textDocument,
           text: update.state.doc.toString(),
@@ -252,31 +264,24 @@ export class TextDocumentSynchronization {
       return this.reset();
     }
 
-    const oldTextDocument = update.startState.field(textDocument);
-    const newTextDocument = update.state.field(textDocument);
-    this.checkReOpen(oldTextDocument, newTextDocument, v[0]);
+    const [c, r] = v;
+    const t = update.state.field(textDocument);
+    this.checkReset(t, c);
 
     if (this.didState === 4) {
-      console.debug("Closing a document:", this.didUri);
+      console.debug("Closing a document:", this.didTextDocument?.uri);
     } else if (this.didState === 0) {
-      this.doOpen(update, newTextDocument, v[0], v[1]);
+      this.doOpen(update, t, c, r);
     } else if (update.docChanged && this.syncOption.change) {
-      this.doChange(update, newTextDocument, v[0]);
+      this.doChange(update, t, c);
     } else if (this.didState === 2) {
-      this.didPendingChanges(v[0]);
+      this.didPendingChanges(c);
     }
   }
 
   // Implementation of ViewPlugin destroy.
   destroy() {
-    if (this.didState >= 2) {
-      const v = getConnectionAndInitializeResult(this.view.state);
-      if (v) {
-        this.didClose(v[0], {
-          textDocument: this.view.state.field(textDocument),
-        });
-      }
-    }
+    // TODO: There should be a UI to explicitly prompt users to close the document, and the destroy method here is primarily for cleaning up the relevant DOM elements rather than handling the document closure.
   }
 }
 
