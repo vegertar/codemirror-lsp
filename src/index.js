@@ -7,7 +7,7 @@ import { cpp } from "@codemirror/lang-cpp";
 import lint from "./lint";
 import link from "./link";
 import file from "./file";
-import navi from "./navi";
+import step from "./step";
 
 import { serverUri } from "./serverUri";
 import client, { initializeParams } from "./client";
@@ -36,7 +36,7 @@ int main() {
     lint(),
     link(),
     file(),
-    navi(),
+    step(),
 
     // LSP implementations
     client(),

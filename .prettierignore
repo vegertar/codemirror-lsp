@@ -6,3 +6,6 @@ coverage
 
 # Ignore all HTML files:
 **/*.html
+
+# Ignore all pem files:
+**/*.pem

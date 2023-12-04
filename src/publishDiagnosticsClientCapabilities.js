@@ -39,15 +39,7 @@ export default function () {
     initializeParams.of({
       capabilities: {
         textDocument: {
-          publishDiagnostics: {
-            relatedInformation: true,
-            versionSupport: false,
-            tagSupport: {
-              valueSet: [1, 2],
-            },
-            codeDescriptionSupport: true,
-            dataSupport: true,
-          },
+          publishDiagnostics: {},
         },
       },
     }),

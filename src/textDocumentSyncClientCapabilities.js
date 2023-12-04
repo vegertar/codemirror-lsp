@@ -73,8 +73,10 @@ export class TextDocumentSynchronization {
 
   /** @type {0 | 1 | 2 | 3 | 4} 0: closed, 1: opening, 2: open, 3: changing, 4: closing */
   didState = 0;
+
   /** @type {TextDocument | null} */
   didTextDocument = null;
+
   /** @type {0 | 1 | 2} 0: nop, 1: prepare to reset, 3: resetting */
   didReset = 0;
 
