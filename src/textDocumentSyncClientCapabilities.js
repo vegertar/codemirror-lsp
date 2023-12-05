@@ -30,16 +30,16 @@ export const textDocument = StateField.define({
     };
   },
   update(value, tr) {
-    return tr.docChanged
-      ? produce(value, (draft) => {
-          draft.version++;
-          const fi = tr.state.field(fileInfo, false);
-          if (fi?.type === "textDocument") {
-            draft.uri = fi.uri;
-            draft.languageId = fi.languageId;
-          }
-        })
-      : value;
+    return produce(value, (draft) => {
+      if (tr.docChanged) {
+        draft.version++;
+      }
+      const fi = tr.state.field(fileInfo, false);
+      if (fi?.type === "textDocument") {
+        draft.uri = fi.uri;
+        draft.languageId = fi.languageId;
+      }
+    });
   },
 });
 

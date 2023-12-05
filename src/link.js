@@ -1,6 +1,6 @@
 // @ts-check
 
-import { EditorState, Facet, StateField, StateEffect } from "@codemirror/state";
+import { Facet, StateField, Annotation } from "@codemirror/state";
 import { hoverTooltip, Decoration, EditorView } from "@codemirror/view";
 
 import {
@@ -8,7 +8,6 @@ import {
   DocumentLinkResolver,
 } from "./documentLinkClientCapabilities";
 import { binarySearch, compareRange, lspRangeToCmRange } from "./utils";
-import { fileOpenEffect } from "./file";
 
 /**
  * @typedef {import("vscode-languageserver-protocol").DocumentLink} DocumentLink
@@ -85,8 +84,8 @@ const documentLinkFacet = Facet.define({
   },
 });
 
-/** @type {import("@codemirror/state").StateEffectType<DocumentLinkStateDetail>} */
-const documentLinkFollowEffect = StateEffect.define();
+/** @type {import("@codemirror/state").AnnotationType<DocumentLinkStateDetail>} */
+export const followLinkEvent = Annotation.define();
 
 function createDocumentLinkCollection() {
   return documentLinkFacet.computeN(
@@ -175,7 +174,7 @@ function createDocumentLinkEventHandler(field) {
 
       const result = view.state.field(field)?.find(pos);
       if (result) {
-        view.dispatch({ effects: documentLinkFollowEffect.of(result) });
+        view.dispatch({ annotations: followLinkEvent.of(result) });
         return true;
       }
     },
@@ -208,21 +207,6 @@ export const documentLink = StateField.define({
   },
 });
 
-export const followLink = EditorState.transactionFilter.of((tr) => {
-  /** @type {import("@codemirror/state").TransactionSpec[]} */
-  const transactions = [tr];
-
-  for (const effect of tr.effects) {
-    if (effect.is(documentLinkFollowEffect) && effect.value.link.target) {
-      transactions.push({
-        effects: fileOpenEffect.of(effect.value.link.target),
-      });
-    }
-  }
-
-  return transactions;
-});
-
 export const baseTheme = EditorView.baseTheme({
   ".cm-linkRange": {
     textDecoration: "underline 1px",
@@ -230,5 +214,5 @@ export const baseTheme = EditorView.baseTheme({
 });
 
 export default function () {
-  return [documentLink, followLink, baseTheme];
+  return [documentLink, baseTheme];
 }

@@ -19,7 +19,7 @@ module.exports = {
         throw new Error("webpack-dev-server is not defined");
       }
 
-      devServer.app.get("/navi/*", function (req, res) {
+      devServer.app.get("/page/*", function (req, res) {
         res.sendFile(__dirname.concat("/dist/index.html"));
       });
     },

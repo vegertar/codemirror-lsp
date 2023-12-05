@@ -49,6 +49,7 @@ export const socket = ViewPlugin.define((view) => {
 
   return {
     destroy() {
+      // TODO: make the socket be destroy free
       webSocket.close();
     },
   };

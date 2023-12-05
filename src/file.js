@@ -1,8 +1,10 @@
 // @ts-check
 
-import { StateField, StateEffect } from "@codemirror/state";
+import { StateField, StateEffect, Annotation } from "@codemirror/state";
 import { ViewPlugin } from "@codemirror/view";
 import { produce } from "immer";
+
+import { followLinkEvent } from "./link";
 
 /**
  * @typedef FileInfo
@@ -14,12 +16,10 @@ import { produce } from "immer";
  */
 
 /** @type {import("@codemirror/state").StateEffectType<FileInfo['uri']>} */
-export const fileOpenEffect = StateEffect.define();
-
-/** @type {import("@codemirror/state").StateEffectType<FileInfo['languageId']>} */
-export const fileChangeLanguageEffect = StateEffect.define();
-
 export const fileLoadEffect = StateEffect.define();
+
+/** @type {import("@codemirror/state").AnnotationType<"load">} */
+export const fileEvent = Annotation.define();
 
 /** @type {import("@codemirror/state").StateField<FileInfo>} */
 export const fileInfo = StateField.define({
@@ -33,10 +33,8 @@ export const fileInfo = StateField.define({
   update(value, tr) {
     return produce(value, (draft) => {
       for (const effect of tr.effects) {
-        if (effect.is(fileOpenEffect)) {
+        if (effect.is(fileLoadEffect)) {
           draft.uri = effect.value;
-        } else if (effect.is(fileChangeLanguageEffect)) {
-          draft.languageId = effect.value;
         }
       }
     });
@@ -60,20 +58,22 @@ async function openFile(uri) {
 export const fileLoader = ViewPlugin.define(() => {
   return {
     update(update) {
-      const oldFileInfo = update.startState.field(fileInfo);
-      const newFileInfo = update.state.field(fileInfo);
-      if (oldFileInfo.uri !== newFileInfo.uri) {
-        openFile(newFileInfo.uri).then((text) => {
-          update.view.dispatch({
-            effects: fileLoadEffect.of(null),
-            changes: {
-              from: 0,
-              to: update.state.doc.length,
-              insert: text,
-            },
+      update.transactions.forEach((tr) => {
+        const uri = tr.annotation(followLinkEvent)?.link.target;
+        if (uri) {
+          openFile(uri).then((text) => {
+            update.view.dispatch({
+              annotations: fileEvent.of("load"),
+              effects: fileLoadEffect.of(uri),
+              changes: {
+                from: 0,
+                to: update.state.doc.length,
+                insert: text,
+              },
+            });
           });
-        });
-      }
+        }
+      });
     },
   };
 });
