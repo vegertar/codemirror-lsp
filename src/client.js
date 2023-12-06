@@ -2,8 +2,11 @@
 
 import { StateField, StateEffect, Facet } from "@codemirror/state";
 import { ViewPlugin } from "@codemirror/view";
-import { listen } from "vscode-ws-jsonrpc";
-import ReconnectingWebSocket from "reconnecting-websocket";
+import {
+  toSocket,
+  ConsoleLogger,
+  createWebSocketConnection,
+} from "vscode-ws-jsonrpc";
 
 import * as packageJson from "../package.json";
 import { serverUri } from "./serverUri";
@@ -28,32 +31,157 @@ export const connection = StateField.define({
   },
 });
 
-/**
- * The socket is defined as a ViewPlugin in which the owned network handler
- * is independent of editing transactions, as redo/undo operations typically
- * do not affect network states.
- */
-export const socket = ViewPlugin.define((view) => {
-  // TODO: reconnect to a new serverUri
-  const webSocket = new ReconnectingWebSocket(view.state.facet(serverUri));
+class ConnectionFactory {
+  /** @type {WeakMap<import("vscode-jsonrpc").MessageConnection, ConnectionFactory>} */
+  static recycled = new WeakMap();
 
-  listen({
-    // @ts-ignore
-    webSocket,
-    onConnection: (connection) => {
-      view.dispatch({
-        effects: connectionEffect.of(connection),
-      });
-    },
-  });
+  /** @type {WebSocket | null} */
+  handler = null;
+  /** @type {import("vscode-jsonrpc").MessageConnection | null} */
+  connection = null;
+  /** @type {ConnectionFactory | null} */
+  delegated = null;
+  destroyId = NaN;
+  destroyed = false;
 
-  return {
-    destroy() {
-      // TODO: make the socket be destroy free
-      webSocket.close();
-    },
+  /**
+   *
+   * @param {import("@codemirror/view").EditorView} view
+   */
+  constructor(view) {
+    this.view = view;
+    this.recycle() || this.open();
+  }
+
+  /**
+   *
+   * @param {string} uri
+   */
+  createWebSocket(uri) {
+    const view = this.view;
+    const handler = (this.handler = new WebSocket(uri));
+
+    handler.addEventListener("open", () => {
+      const c = createWebSocketConnection(
+        toSocket(handler),
+        new ConsoleLogger(),
+      );
+      this.connection = c;
+      view.dispatch({ effects: connectionEffect.of(c) });
+    });
+    handler.addEventListener("close", () => {
+      // The close event should be dispatched only once during the entire lifetime of a socket.
+      // Hence simply create a new one if closed non-manually.
+      if (!this.destroyed) {
+        requestIdleCallback(this.open);
+      }
+    });
+  }
+
+  open = () => {
+    const uri = this.view.state.facet(serverUri);
+    const url = new URL(uri);
+    switch (url.protocol) {
+      case "ws:":
+      case "wss:":
+        this.createWebSocket(uri);
+        break;
+      default:
+        throw new Error(`Unsupported URI: ${uri}`);
+    }
   };
-});
+
+  close() {
+    this.destroyed = true;
+    this.handler?.close();
+  }
+
+  recycle() {
+    const c = this.view.state.field(connection);
+    if (!c) {
+      return false;
+    }
+
+    const recycled = ConnectionFactory.recycled.get(c);
+    if (!recycled) {
+      return false;
+    }
+
+    this.delegated = recycled;
+    cancelIdleCallback(this.delegated.destroyId);
+    return true;
+  }
+
+  /**
+   * Implementation of the ViewPlugin update.
+   * @param {import("@codemirror/view").ViewUpdate} update
+   * @returns {void}
+   */
+  update(update) {
+    /**
+     * Consider the following scenario:
+     * - Create an EditorView with the root EditorState, denoted as A(0).
+     * - A(0) dispatches a new connection.
+     * - The current EditorState is A(1).
+     * - Perform various transactions, leading to the current EditorState A(n).
+     * - Call EditorView.setState with an older EditorState; let's say A(k) where 0 < k < n:
+     *   - Destroy all ViewPlugins at A(n).
+     *   - Initialize all ViewPlugins at A(k).
+     * - The current EditorState is now A(k), and the socket ViewPlugin recycles the one destroyed at A(n).
+     * - Disconnect the connection.
+     * - The socket ViewPlugin reconnects and dispatches the new connection to the current EditorState A(k).
+     * - Call EditorView.setState with A(n):
+     *   - Destroy all ViewPlugins at A(k).
+     *   - Initialize all ViewPlugins at A(n).
+     * - The current EditorState is A(n), where:
+     *   - The connection StateField is not null but has been closed.
+     *   - The value associated with the connection in ConnectionFactory.recycled is present.
+     * - A(n) recycles the socket ViewPlugin destroyed early by itself.
+     * - A(n) remains disconnected until the connection held by A(k) is lost.
+     */
+    if (!this.consistent(update)) {
+      console.error("Inconsistent connection");
+    }
+  }
+
+  /**
+   *
+   * @param {{state: import("@codemirror/state").EditorState}} param0
+   */
+  consistent({ state }) {
+    const c = this.connection || this.delegated?.connection || null;
+    return c === state.field(connection);
+  }
+
+  /**
+   * Implementation of the ViewPlugin destroy.
+   * @returns {void}
+   */
+  destroy() {
+    if (this.delegated) {
+      return this.delegated.destroy();
+    }
+
+    if (!this.handler) {
+      return;
+    }
+
+    const c = this.connection;
+    if (!c) {
+      return this.close();
+    }
+
+    // Place the destroy procedure in the idle callback to allow for the reuse of the present
+    // connection in operations like "reload," where creation immediately follows destruction.
+    this.destroyId = requestIdleCallback(() => {
+      ConnectionFactory.recycled.delete(c);
+      this.close();
+    });
+    ConnectionFactory.recycled.set(c, this);
+  }
+}
+
+export const socket = ViewPlugin.fromClass(ConnectionFactory);
 
 /** @type {Facet<Partial<import("vscode-languageserver-protocol").InitializeParams>, Partial<import("vscode-languageserver-protocol").InitializeParams>>} */
 export const initializeParams = Facet.define({

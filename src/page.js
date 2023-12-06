@@ -31,6 +31,7 @@ export const pageNavigator = ViewPlugin.define((view) => {
         if (tr.annotation(fileEvent) === "load") {
           history.replaceState(prevNumber, "");
           history.pushState(null, "");
+          break;
         }
       }
 
