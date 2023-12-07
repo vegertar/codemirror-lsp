@@ -7,7 +7,7 @@ import {
   DocumentLinkProvider,
   DocumentLinkResolver,
 } from "./documentLinkClientCapabilities";
-import { binarySearch, compareRange, lspRangeToCmRange } from "./utils";
+import { binarySearch, compareRange, lspRangeToCm } from "./utils";
 
 /**
  * @typedef {import("vscode-languageserver-protocol").DocumentLink} DocumentLink
@@ -42,7 +42,7 @@ function createDocumentLinkState(links, doc) {
   const decorations = Decoration.set(
     links.map((link, i) =>
       Decoration.mark({ class: "cm-linkRange", i }).range(
-        ...lspRangeToCmRange(link.range, doc),
+        ...lspRangeToCm(link.range, doc),
       ),
     ),
   );
@@ -150,7 +150,6 @@ function createDocumentLinkTooltip(field) {
       ? {
           pos: result.start,
           end: result.end,
-          above: true,
           create: (view) => createView.call(view, result.link),
         }
       : null;
@@ -174,6 +173,7 @@ function createDocumentLinkEventHandler(field) {
 
       const result = view.state.field(field)?.find(pos);
       if (result) {
+        // TODO: close the present open file
         view.dispatch({ annotations: followLinkEvent.of(result) });
         return true;
       }

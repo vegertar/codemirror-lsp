@@ -10,7 +10,7 @@ import {
   initializeResultEffect,
 } from "./client";
 import { fileInfo } from "./file";
-import { cmPositionToLspPosition } from "./utils";
+import { cmPositionToLsp } from "./utils";
 
 /**
  * @typedef {Omit<import("vscode-languageserver-types").TextDocumentItem, "text">} TextDocument
@@ -230,8 +230,8 @@ export class TextDocumentSynchronization {
 
     if (this.syncOption.change === 2) {
       update.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
-        const start = cmPositionToLspPosition(fromA, update.startState.doc);
-        const end = cmPositionToLspPosition(toA, update.startState.doc);
+        const start = cmPositionToLsp(fromA, update.startState.doc);
+        const end = cmPositionToLsp(toA, update.startState.doc);
         contentChanges.push({
           range: { start, end },
           text: inserted.toString(),

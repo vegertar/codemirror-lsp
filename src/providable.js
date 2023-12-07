@@ -6,10 +6,16 @@ import { getLastValueFromTransaction, getValueIfNeedsRefresh } from "./utils";
 import { getConnectionAndInitializeResult, initializeResult } from "./client";
 import { TextDocumentSynchronization } from "./textDocumentSyncClientCapabilities";
 
+/**
+ * Provides capabilities mapping for the client request *method* to the server capability *property*.
+ * Every change to the map should be accompanied by the mutation of relative Request and Response
+ * definitions below.
+ */
 const providableCapabilities = /** @type {const} */ ({
   "textDocument/documentLink": "documentLinkProvider",
   "documentLink/resolve": "documentLinkProvider",
   "textDocument/documentSymbol": "documentSymbolProvider",
+  "textDocument/hover": "hoverProvider",
 });
 
 /**
@@ -43,16 +49,28 @@ const providableCapabilities = /** @type {const} */ ({
  */
 
 /**
+ * @typedef HoverRequest
+ * @type {import("vscode-languageserver-protocol").HoverParams}
+ */
+
+/**
+ * @typedef HoverResponse
+ * @type {import("vscode-languageserver-types").Hover | null}
+ */
+
+/**
  * @typedef {T extends "textDocument/documentLink" ? LinkRequest :
  * T extends "documentLink/resolve" ? LinkResolveRequest :
- * T extends "textDocument/documentSymbol" ? SymbolRequest : never} ProvidableRequest<T>
+ * T extends "textDocument/documentSymbol" ? SymbolRequest :
+ * T extends "textDocument/hover" ? HoverRequest : never} ProvidableRequest<T>
  * @template T
  */
 
 /**
  * @typedef {T extends "textDocument/documentLink" ? LinkResponse :
  * T extends "documentLink/resolve" ? LinkResolveResponse :
- * T extends "textDocument/documentSymbol" ? SymbolResponse : never} ProvidableResponse<T>
+ * T extends "textDocument/documentSymbol" ? SymbolResponse :
+ * T extends "textDocument/hover" ? HoverResponse : never} ProvidableResponse<T>
  * @template T
  */
 
@@ -111,17 +129,20 @@ export function providable(method, stateCreate, stateUpdate) {
 
     /**
      *
-     * @param {import("@codemirror/view").ViewUpdate} update
+     * @param {{state: import("@codemirror/state").EditorState}} param0
      * @returns {ProvidableRequest<T>}
      */
-    params(update) {
-      void update;
+    params({ state }) {
+      void state;
       throw new Error("Must be implemented by subclass!");
     }
 
     /**
      *
-     * @param {import("@codemirror/view").ViewUpdate} update
+     * @param {{
+     *   state: import("@codemirror/state").EditorState,
+     *   startState: import("@codemirror/state").EditorState,
+     * }} update
      * @returns {boolean}
      */
     needsRefresh(update) {
@@ -148,22 +169,22 @@ export function providable(method, stateCreate, stateUpdate) {
 
     /**
      *
-     * @param {import("vscode-languageserver-protocol").ServerCapabilities[typeof provider] | undefined} capability
      * @param {import("vscode-languageserver-protocol").InitializeResult} r
+     * @param {typeof provider} provider
      * @returns {boolean}
      */
     // eslint-disable-next-line no-unused-vars
-    isCapable(capability, r) {
-      return !!capability;
+    isCapable(r, provider) {
+      return !!r.capabilities[provider];
     }
 
     /**
      *
-     * @param {import("@codemirror/view").ViewUpdate} update
+     * @param {{view: import("@codemirror/view").EditorView}} param0
      * @param {ProvidableResponse<T>} response
      */
-    dispatch(update, response) {
-      update.view.dispatch({
+    dispatch({ view }, response) {
+      view.dispatch({
         effects: Provider.effect.of(response),
       });
     }
@@ -190,9 +211,8 @@ export function providable(method, stateCreate, stateUpdate) {
       const v = getConnectionAndInitializeResult(update.state);
 
       if (
-        v &&
-        v[1] &&
-        this.isCapable(v[1].capabilities[provider], v[1]) &&
+        v?.[1] &&
+        this.isCapable(v[1], provider) &&
         this.needsRefresh(update)
       ) {
         this.refresh(update, v[0], v[1]);

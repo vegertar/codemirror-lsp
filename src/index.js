@@ -17,6 +17,7 @@ import publishDiagnosticsClientCapabilities from "./publishDiagnosticsClientCapa
 import textDocumentSyncClientCapabilities from "./textDocumentSyncClientCapabilities";
 import documentLinkClientCapabilities from "./documentLinkClientCapabilities";
 import documentSymbolClientCapabilities from "./documentSymbolClientCapabilities";
+import hoverClientCapabilities from "./hoverClientCapabilities";
 
 new EditorView({
   doc: String.raw`#include <stdio.h>
@@ -45,6 +46,7 @@ int main() {
     textDocumentSyncClientCapabilities(),
     documentLinkClientCapabilities(),
     documentSymbolClientCapabilities(),
+    hoverClientCapabilities(),
 
     // LSP configurations
     initializeParams.of({

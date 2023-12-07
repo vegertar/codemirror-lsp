@@ -3,8 +3,8 @@
 import { linter } from "@codemirror/lint";
 import { publishDiagnosticsParams } from "./publishDiagnosticsClientCapabilities";
 import {
-  lspPositionToCmPosition,
-  lspSeverityToCmSeverity,
+  lspPositionToCm,
+  lspSeverityToCm,
   getValueIfNeedsRefresh,
 } from "./utils";
 
@@ -13,9 +13,9 @@ export const diagnosticLint = linter(
     const params = view.state.field(publishDiagnosticsParams);
     if (params) {
       return params.diagnostics.map((item) => ({
-        from: lspPositionToCmPosition(item.range.start, view.state.doc),
-        to: lspPositionToCmPosition(item.range.end, view.state.doc),
-        severity: lspSeverityToCmSeverity(item.severity),
+        from: lspPositionToCm(item.range.start, view.state.doc),
+        to: lspPositionToCm(item.range.end, view.state.doc),
+        severity: lspSeverityToCm(item.severity),
         message: item.message,
       }));
     }

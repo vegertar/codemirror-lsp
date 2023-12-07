@@ -71,7 +71,7 @@ export function getLastValueFromTransaction(tr, valueEffect) {
  * @param {import("@codemirror/state").Text} text
  * @returns {import("vscode-languageserver-types").Position}
  */
-export function cmPositionToLspPosition(pos, text) {
+export function cmPositionToLsp(pos, text) {
   const line = text.lineAt(pos);
 
   return {
@@ -86,7 +86,7 @@ export function cmPositionToLspPosition(pos, text) {
  * @param {import("@codemirror/state").Text} text
  * @returns {number}
  */
-export function lspPositionToCmPosition(pos, text) {
+export function lspPositionToCm(pos, text) {
   const line = text.line(pos.line + 1);
   return line.from + pos.character;
 }
@@ -97,11 +97,8 @@ export function lspPositionToCmPosition(pos, text) {
  * @param {import("@codemirror/state").Text} text
  * @returns {[number, number]}
  */
-export function lspRangeToCmRange(range, text) {
-  return [
-    lspPositionToCmPosition(range.start, text),
-    lspPositionToCmPosition(range.end, text),
-  ];
+export function lspRangeToCm(range, text) {
+  return [lspPositionToCm(range.start, text), lspPositionToCm(range.end, text)];
 }
 
 /**
@@ -109,7 +106,7 @@ export function lspRangeToCmRange(range, text) {
  * @param {import("vscode-languageserver-types").DiagnosticSeverity | undefined} severity
  * @returns {import("@codemirror/lint").Diagnostic['severity']}
  */
-export function lspSeverityToCmSeverity(severity) {
+export function lspSeverityToCm(severity) {
   switch (severity) {
     case 1:
       return "error";

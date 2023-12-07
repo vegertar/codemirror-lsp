@@ -149,7 +149,7 @@ class ConnectionFactory {
    * @param {{state: import("@codemirror/state").EditorState}} param0
    */
   consistent({ state }) {
-    const c = this.connection || this.delegated?.connection || null;
+    const c = this.delegated?.connection || this.connection;
     return c === state.field(connection);
   }
 

@@ -49,8 +49,8 @@ export class DocumentLinkResolver extends BaseDocumentLinkResolver {
   links;
 
   /** @type {BaseDocumentLinkResolver['isCapable']} */
-  isCapable(capability) {
-    return !!capability?.resolveProvider;
+  isCapable(r, provider) {
+    return !!r[provider]?.resolveProvider;
   }
 
   /** @type {BaseDocumentLinkResolver['needsRefresh']} */
