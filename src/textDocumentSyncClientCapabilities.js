@@ -9,12 +9,17 @@ import {
   initializeParams,
   initializeResultEffect,
 } from "./client";
-import { fileInfo } from "./file";
 import { cmPositionToLsp } from "./utils";
 
 /**
  * @typedef {Omit<import("vscode-languageserver-types").TextDocumentItem, "text">} TextDocument
  */
+
+/** @type {import("@codemirror/state").StateEffectType<TextDocument['uri']>} */
+export const textDocumentUriEffect = StateEffect.define();
+
+/** @type {import("@codemirror/state").StateEffectType<TextDocument['languageId']>} */
+export const textDocumentLanguageIdEffect = StateEffect.define();
 
 /**
  * The textDocument extension carries the fields mentioned by LSP TextDocumentItem
@@ -34,10 +39,12 @@ export const textDocument = StateField.define({
       if (tr.docChanged) {
         draft.version++;
       }
-      const fi = tr.state.field(fileInfo, false);
-      if (fi?.type === "textDocument") {
-        draft.uri = fi.uri;
-        draft.languageId = fi.languageId;
+      for (const effect of tr.effects) {
+        if (effect.is(textDocumentUriEffect)) {
+          draft.uri = effect.value;
+        } else if (effect.is(textDocumentLanguageIdEffect)) {
+          draft.languageId = effect.value;
+        }
       }
     });
   },

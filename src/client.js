@@ -251,28 +251,31 @@ export class BeforeHandshake {
   });
 
   /**
-   * @typedef ResolverRejector
-   * @type {(state: import("@codemirror/state").EditorState) => ((value?: any) => void) | undefined}
+   * @typedef Resolver
+   * @type {(state: import("@codemirror/state").EditorState) => (() => void) | undefined}
+   */
+
+  /**
+   * @typedef Rejector
+   * @type {(state: import("@codemirror/state").EditorState) => ((reason?: any) => void) | undefined}
    */
 
   /**
    * @template {import("@codemirror/view").PluginValue} V
-   * @param {(view: import("@codemirror/view").EditorView, resolver: ResolverRejector, rejector: ResolverRejector) => V} create
+   * @param {(view: import("@codemirror/view").EditorView, resolver: Resolver, rejector: Rejector) => V} create
    * @param {import("@codemirror/view").PluginSpec<V>} [spec]
    * @returns
    */
-  static define(create, spec) {
-    return promisable(BeforeHandshake.promise, connectionEffect, (field) =>
-      ViewPlugin.define(
-        (view) =>
-          create(
-            view,
-            (state) => state.field(field)?.[1],
-            (state) => state.field(field)?.[2],
-          ),
-        spec,
-      ),
+  static define(create, spec = {}) {
+    const { state, resolver, rejector } = promisable(
+      BeforeHandshake.promise,
+      connectionEffect,
     );
+
+    return ViewPlugin.define((view) => create(view, resolver, rejector), {
+      ...spec,
+      provide: (v) => (spec.provide ? [state, spec.provide(v)] : state),
+    });
   }
 
   /**

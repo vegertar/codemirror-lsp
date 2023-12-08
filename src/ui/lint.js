@@ -1,12 +1,12 @@
 // @ts-check
 
 import { linter } from "@codemirror/lint";
-import { publishDiagnosticsParams } from "./publishDiagnosticsClientCapabilities";
+import { publishDiagnosticsParams } from "../publishDiagnosticsClientCapabilities";
 import {
   lspPositionToCm,
   lspSeverityToCm,
   getValueIfNeedsRefresh,
-} from "./utils";
+} from "../utils";
 
 export const diagnosticLint = linter(
   (view) => {

@@ -28,7 +28,7 @@ export const pageNavigator = ViewPlugin.define((view) => {
       const currNumber = update.state.field(stepNumber);
 
       for (const tr of update.transactions) {
-        if (tr.annotation(fileEvent) === "load") {
+        if (tr.annotation(fileEvent)?.type == "load") {
           history.replaceState(prevNumber, "");
           history.pushState(null, "");
           break;

@@ -1,13 +1,13 @@
 // @ts-check
 
 import { Facet, StateField, Annotation } from "@codemirror/state";
-import { hoverTooltip, Decoration, EditorView } from "@codemirror/view";
+import { Decoration, EditorView } from "@codemirror/view";
 
 import {
   DocumentLinkProvider,
   DocumentLinkResolver,
-} from "./documentLinkClientCapabilities";
-import { binarySearch, compareRange, lspRangeToCm } from "./utils";
+} from "../documentLinkClientCapabilities";
+import { binarySearch, compareRange, lspRangeToCm } from "../utils";
 
 /**
  * @typedef {import("vscode-languageserver-protocol").DocumentLink} DocumentLink
@@ -84,8 +84,16 @@ const documentLinkFacet = Facet.define({
   },
 });
 
-/** @type {import("@codemirror/state").AnnotationType<DocumentLinkStateDetail>} */
-export const followLinkEvent = Annotation.define();
+/**
+ * @typedef LinkEvent
+ * @type {{
+ *   type: "follow",
+ *   data: DocumentLinkStateDetail,
+ * }}
+ */
+
+/** @type {import("@codemirror/state").AnnotationType<LinkEvent>} */
+export const linkEvent = Annotation.define();
 
 function createDocumentLinkCollection() {
   return documentLinkFacet.computeN(
@@ -132,34 +140,6 @@ function createDocumentLinkDecorations(field) {
  *
  * @param {import("@codemirror/state").StateField<DocumentLinkState>} field
  */
-function createDocumentLinkTooltip(field) {
-  /**
-   * @this {import("@codemirror/view").EditorView}
-   * @param {DocumentLink} link
-   * @returns {import("@codemirror/view").TooltipView}
-   */
-  function createView(link) {
-    const dom = document.createElement("div");
-    dom.textContent = link.target || null;
-    return { dom };
-  }
-
-  return hoverTooltip((view, pos) => {
-    const result = view.state.field(field).find(pos);
-    return result
-      ? {
-          pos: result.start,
-          end: result.end,
-          create: (view) => createView.call(view, result.link),
-        }
-      : null;
-  });
-}
-
-/**
- *
- * @param {import("@codemirror/state").StateField<DocumentLinkState>} field
- */
 function createDocumentLinkEventHandler(field) {
   return EditorView.domEventHandlers({
     click({ ctrlKey, clientX: x, clientY: y }, view) {
@@ -174,7 +154,9 @@ function createDocumentLinkEventHandler(field) {
       const result = view.state.field(field)?.find(pos);
       if (result) {
         // TODO: close the present open file
-        view.dispatch({ annotations: followLinkEvent.of(result) });
+        view.dispatch({
+          annotations: linkEvent.of({ type: "follow", data: result }),
+        });
         return true;
       }
     },
@@ -201,7 +183,6 @@ export const documentLink = StateField.define({
     return [
       createDocumentLinkCollection(),
       createDocumentLinkDecorations(field),
-      createDocumentLinkTooltip(field),
       createDocumentLinkEventHandler(field),
     ];
   },

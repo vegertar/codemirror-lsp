@@ -94,7 +94,7 @@ const providableCapabilities = /** @type {const} */ ({
  */
 export function providable(method, stateCreate, stateUpdate) {
   const provider = providableCapabilities[method];
-  return class Provider {
+  return class Providing {
     /** @type {import("@codemirror/state").StateEffectType<ProvidableResponse<T>>} */
     static effect = StateEffect.define();
 
@@ -107,12 +107,17 @@ export function providable(method, stateCreate, stateUpdate) {
         if (stateUpdate) {
           return stateUpdate(value, tr);
         }
-        const response = getLastValueFromTransaction(tr, Provider.effect);
+        const response = getLastValueFromTransaction(tr, Providing.effect);
         return response !== undefined
           ? stateCreate.call(tr.state, response)
           : value;
       },
     });
+
+    /** @type {import("@codemirror/view").PluginSpec<Providing>} */
+    static spec = {
+      provide: () => [Providing.state],
+    };
 
     refreshAfterHandshake = false;
     refreshAfterSynchronization = false;
@@ -185,7 +190,7 @@ export function providable(method, stateCreate, stateUpdate) {
      */
     dispatch({ view }, response) {
       view.dispatch({
-        effects: Provider.effect.of(response),
+        effects: Providing.effect.of(response),
       });
     }
 

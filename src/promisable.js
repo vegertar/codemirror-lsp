@@ -5,7 +5,7 @@ import { StateField } from "@codemirror/state";
 import { getLastValueFromTransaction } from "./utils";
 
 /**
- * @typedef PromisableField
+ * @typedef PromisingState
  * @type {StateField<null | [Promise<void>, () => void, (reason?: any) => void]>}
  */
 
@@ -13,35 +13,47 @@ import { getLastValueFromTransaction } from "./utils";
  * @template U
  * @param {import("@codemirror/state").Facet<Promise<void>, Promise<void | void[]>>} facet
  * @param {import("@codemirror/state").StateEffectType<U>} effect
- * @param {(field: PromisableField) => import("@codemirror/state").Extension} create
- * @returns {import("@codemirror/state").Extension[]}
  */
-export function promisable(facet, effect, create) {
-  /** @type {PromisableField} */
-  const field = StateField.define({
-    create() {
-      return null;
-    },
+export function promisable(facet, effect) {
+  return class Promising {
+    /** @type {PromisingState} */
+    static state = StateField.define({
+      create() {
+        return null;
+      },
 
-    // @ts-ignore
-    update(value, tr) {
-      if (getLastValueFromTransaction(tr, effect) !== undefined) {
-        let resolve, reject;
+      // @ts-ignore
+      update(value, tr) {
+        if (getLastValueFromTransaction(tr, effect) !== undefined) {
+          let resolve, reject;
 
-        const promise = new Promise((r0, r1) => {
-          resolve = r0;
-          reject = r1;
-        });
+          const promise = new Promise((r0, r1) => {
+            resolve = r0;
+            reject = r1;
+          });
 
-        return [promise, resolve, reject];
-      }
-      return value;
-    },
-  });
+          return [promise, resolve, reject];
+        }
+        return value;
+      },
 
-  return [
-    field,
-    facet.from(field, (value) => value?.[0] || Promise.resolve()),
-    create(field),
-  ];
+      provide: (f) => facet.from(f, (value) => value?.[0] || Promise.resolve()),
+    });
+
+    /**
+     *
+     * @param {import("@codemirror/state").EditorState} state
+     */
+    static resolver(state) {
+      return state.field(Promising.state)?.[1];
+    }
+
+    /**
+     *
+     * @param {import("@codemirror/state").EditorState} state
+     */
+    static rejector(state) {
+      return state.field(Promising.state)?.[2];
+    }
+  };
 }

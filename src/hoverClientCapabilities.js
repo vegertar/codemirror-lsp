@@ -58,7 +58,7 @@ export const hoverTooltip = createHoverTooltip(async (view, pos) => {
 
 export default function () {
   return [
-    hoverTooltip,
+    // hoverTooltip,
     initializeParams.of({
       capabilities: {
         textDocument: {

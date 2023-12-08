@@ -75,15 +75,15 @@ export class DocumentLinkResolver extends BaseDocumentLinkResolver {
   }
 }
 
-export const documentLinkProvider = [
-  DocumentLinkProvider.state,
-  ViewPlugin.fromClass(DocumentLinkProvider),
-];
+export const documentLinkProvider = ViewPlugin.fromClass(
+  DocumentLinkProvider,
+  DocumentLinkProvider.spec,
+);
 
-export const documentLinkResolver = [
-  DocumentLinkResolver.state,
-  ViewPlugin.fromClass(DocumentLinkResolver),
-];
+export const documentLinkResolver = ViewPlugin.fromClass(
+  DocumentLinkResolver,
+  DocumentLinkResolver.spec,
+);
 
 export default function () {
   return [
