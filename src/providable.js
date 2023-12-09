@@ -134,20 +134,17 @@ export function providable(method, stateCreate, stateUpdate) {
 
     /**
      *
-     * @param {{state: import("@codemirror/state").EditorState}} param0
+     * @param {import("@codemirror/view").ViewUpdate} update
      * @returns {ProvidableRequest<T>}
      */
-    params({ state }) {
-      void state;
+    params(update) {
+      void update;
       throw new Error("Must be implemented by subclass!");
     }
 
     /**
      *
-     * @param {{
-     *   state: import("@codemirror/state").EditorState,
-     *   startState: import("@codemirror/state").EditorState,
-     * }} update
+     * @param {import("@codemirror/view").ViewUpdate} update
      * @returns {boolean}
      */
     needsRefresh(update) {
@@ -185,7 +182,7 @@ export function providable(method, stateCreate, stateUpdate) {
 
     /**
      *
-     * @param {{view: import("@codemirror/view").EditorView}} param0
+     * @param {import("@codemirror/view").ViewUpdate} update
      * @param {ProvidableResponse<T>} response
      */
     dispatch({ view }, response) {

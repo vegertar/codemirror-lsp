@@ -1,18 +1,20 @@
 // @ts-check
 
-import { StateField, StateEffect } from "@codemirror/state";
+import { Annotation, StateField, StateEffect } from "@codemirror/state";
 
 import { getLastValueFromTransaction } from "./utils";
 
 export function hoverable() {
   return class Hovering {
-    /** @type {import("@codemirror/state").StateEffectType<MouseEvent>} */
+    /** @type {import("@codemirror/state").AnnotationType<MouseEvent>} */
+    static event = Annotation.define();
+
+    /** @type {import("@codemirror/state").StateEffectType<number>} */
     static effect = StateEffect.define();
 
     static state = StateField.define({
-      /** @returns {MouseEvent | null} */
       create() {
-        return null;
+        return NaN;
       },
       update(value, tr) {
         return getLastValueFromTransaction(tr, Hovering.effect) || value;
@@ -64,7 +66,8 @@ export function hoverable() {
         );
       } else if (this.lastMove.event) {
         this.view.dispatch({
-          effects: Hovering.effect.of(this.lastMove.event),
+          annotations: Hovering.event.of(this.lastMove.event),
+          effects: Hovering.effect.of(this.getPosition(this.lastMove.event)),
         });
       }
     };
@@ -75,33 +78,13 @@ export function hoverable() {
         this.hoverTimeoutId = null;
       }
     }
+
+    /**
+     *
+     * @param {MouseEvent} event
+     */
+    getPosition({ clientX: x, clientY: y }) {
+      return this.view.posAtCoords({ x, y }) || NaN;
+    }
   };
 }
-
-// /**
-//  *
-//  * @param {import("@codemirror/state").StateField<DocumentLinkState>} field
-//  */
-// function createDocumentLinkTooltip(field) {
-//   /**
-//    * @this {import("@codemirror/view").EditorView}
-//    * @param {DocumentLink} link
-//    * @returns {import("@codemirror/view").TooltipView}
-//    */
-//   function createView(link) {
-//     const dom = document.createElement("div");
-//     dom.textContent = link.target || null;
-//     return { dom };
-//   }
-
-//   return hoverTooltip((view, pos) => {
-//     const result = view.state.field(field).find(pos);
-//     return result
-//       ? {
-//           pos: result.start,
-//           end: result.end,
-//           create: (view) => createView.call(view, result.link),
-//         }
-//       : null;
-//   });
-// }

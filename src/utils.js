@@ -191,3 +191,11 @@ export function binarySearch(array, item, f, first, last) {
 
   return start;
 }
+
+/**
+ *
+ * @param {string} name
+ */
+export function logMissingField(name) {
+  console.debug("The extension is missing:", name);
+}

@@ -8,6 +8,8 @@ import {
   DocumentLinkResolver,
 } from "../documentLinkClientCapabilities";
 import { binarySearch, compareRange, lspRangeToCm } from "../utils";
+import { Hover } from "../hoverClientCapabilities";
+import { hint } from "./hint";
 
 /**
  * @typedef {import("vscode-languageserver-protocol").DocumentLink} DocumentLink
@@ -163,6 +165,36 @@ function createDocumentLinkEventHandler(field) {
   });
 }
 
+/**
+ *
+ * @param {import("@codemirror/state").StateField<DocumentLinkState>} field
+ */
+function createDocumentLinkHint(field) {
+  /**
+   * @this {import("@codemirror/view").EditorView}
+   * @param {DocumentLink} link
+   * @returns {import("@codemirror/view").TooltipView}
+   */
+  function createView(link) {
+    const dom = document.createElement("div");
+    dom.textContent = link.target || null;
+    return { dom };
+  }
+
+  return hint.compute([Hover.state], (state) => {
+    const pos = Hover.value(state);
+    const result = pos != null ? state.field(field).find(pos) : null;
+
+    return (
+      result && {
+        pos: result.start,
+        end: result.end,
+        create: (view) => createView.call(view, result.link),
+      }
+    );
+  });
+}
+
 export const documentLink = StateField.define({
   /** @returns {DocumentLinkState} */
   create(state) {
@@ -184,6 +216,7 @@ export const documentLink = StateField.define({
       createDocumentLinkCollection(),
       createDocumentLinkDecorations(field),
       createDocumentLinkEventHandler(field),
+      createDocumentLinkHint(field),
     ];
   },
 });

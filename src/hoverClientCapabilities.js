@@ -1,64 +1,94 @@
 // @ts-check
 
-import { hoverTooltip as createHoverTooltip } from "@codemirror/view";
+import { ViewPlugin } from "@codemirror/view";
 
-import { getConnectionAndInitializeResult, initializeParams } from "./client";
+import { initializeParams } from "./client";
 import { textDocument } from "./textDocumentSyncClientCapabilities";
-import { cmPositionToLsp, lspRangeToCm } from "./utils";
+import {
+  cmPositionToLsp,
+  getValueIfNeedsRefresh,
+  logMissingField,
+} from "./utils";
+import { hoverable } from "./hoverable";
+import { providable } from "./providable";
 
-/**
- * @this {import("@codemirror/view").EditorView}
- * @param {import("vscode-languageserver-types").Hover} hover
- * @returns {import("@codemirror/view").TooltipView}
- */
-function createView(hover) {
-  const dom = document.createElement("div");
-  dom.textContent = JSON.stringify(hover.contents);
-  return { dom };
+export class Hover extends hoverable() {
+  /**
+   *
+   * @param {import("@codemirror/state").EditorState} state
+   */
+  static value(state) {
+    const pos = state.field(Hover.state, false);
+    if (pos === undefined) {
+      logMissingField("Hover.state");
+    } else if (isNaN(pos)) {
+      return null;
+    }
+    return pos;
+  }
 }
 
-export const hoverTooltip = createHoverTooltip(async (view, pos) => {
-  const v = getConnectionAndInitializeResult(view.state);
-  if (!v?.[1]?.capabilities.hoverProvider) {
-    return null;
+export class HoverProvider extends providable(
+  "textDocument/hover",
+  (r) => r || null,
+) {
+  /**
+   *
+   * @param {import("@codemirror/state").EditorState} state
+   * @returns
+   */
+  static value(state) {
+    const response = state.field(HoverProvider.state, false);
+    if (response === undefined) {
+      logMissingField("HoverProvider.state");
+    }
+    return response;
   }
 
-  const c = v[0];
+  pos = NaN;
 
-  /** @type {import("vscode-languageserver-protocol").HoverParams} */
-  const request = {
-    textDocument: view.state.field(textDocument),
-    position: cmPositionToLsp(pos, view.state.doc),
-  };
-
-  /** @type {import("vscode-languageserver-types").Hover | null} */
-  const response = await c.sendRequest("textDocument/hover", request);
-  if (!response) {
-    return null;
+  /**
+   *
+   * @param {import("@codemirror/view").ViewUpdate} update
+   * @returns
+   */
+  params(update) {
+    if (isNaN(this.pos)) {
+      throw new Error("Invalid pos");
+    }
+    return {
+      textDocument: update.state.field(textDocument),
+      position: cmPositionToLsp(this.pos, update.view.state.doc),
+    };
   }
 
-  /** @type {import("@codemirror/view").Tooltip} */
-  const result = {
-    pos,
-    create: (view) => createView.call(view, response),
-  };
+  /**
+   *
+   * @param {import("@codemirror/view").ViewUpdate} update
+   * @returns
+   */
+  needsRefresh(update) {
+    const pos = getValueIfNeedsRefresh(update, Hover.state, false);
+    if (pos === undefined || isNaN(pos)) {
+      return false;
+    }
 
-  if (response.range) {
-    const [start, end] = lspRangeToCm(response.range, view.state.doc);
-    result.pos = start;
-    result.end = end;
-  } else {
-    const line = view.state.doc.lineAt(pos);
-    result.pos = line.from;
-    result.end = line.to;
+    this.pos = pos;
+    return true;
   }
+}
 
-  return result;
-});
+export const hover = ViewPlugin.fromClass(Hover, Hover.spec);
+
+export const hoverProvider = ViewPlugin.fromClass(
+  HoverProvider,
+  HoverProvider.spec,
+);
 
 export default function () {
   return [
-    // hoverTooltip,
+    hover,
+    hoverProvider,
     initializeParams.of({
       capabilities: {
         textDocument: {

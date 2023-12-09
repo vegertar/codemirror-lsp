@@ -16,7 +16,7 @@ import { promisable } from "./promisable";
 export const { name, version } = packageJson;
 
 /**
- * An effect to notify there is a new connection.
+ * An effect to set a new connection.
  * @type {import("@codemirror/state").StateEffectType<import("vscode-jsonrpc").MessageConnection>}
  */
 export const connectionEffect = StateEffect.define();
@@ -189,7 +189,7 @@ export const initializeParams = Facet.define({
 });
 
 /**
- * An effect to notify the handshake is finished.
+ * An effect to set the handshake result.
  * @type {import("@codemirror/state").StateEffectType<[import("vscode-jsonrpc").MessageConnection, import("vscode-languageserver-protocol").InitializeResult]>}
  */
 export const initializeResultEffect = StateEffect.define();
@@ -252,12 +252,12 @@ export class BeforeHandshake {
 
   /**
    * @typedef Resolver
-   * @type {(state: import("@codemirror/state").EditorState) => (() => void) | undefined}
+   * @type {(state: import("@codemirror/state").EditorState) => (() => void)}
    */
 
   /**
    * @typedef Rejector
-   * @type {(state: import("@codemirror/state").EditorState) => ((reason?: any) => void) | undefined}
+   * @type {(state: import("@codemirror/state").EditorState) => ((reason?: any) => void)}
    */
 
   /**
@@ -283,7 +283,12 @@ export class BeforeHandshake {
    * @param {(update: import("@codemirror/view").ViewUpdate, connection: import("vscode-jsonrpc").MessageConnection) => Promise<void | (() => void)>} fn The async routine used to operate the connection before handshake, in which an optional cleanup process is returned.
    */
   static from(fn) {
-    return BeforeHandshake.define((_, resolver) => {
+    return BeforeHandshake.define((view, resolver) => {
+      // Fulfil the initial promise to avoid legacy errors raised by promisable() at Webpack HMR
+      if (!getConnectionAndInitializeResult(view.state)) {
+        resolver(view.state)();
+      }
+
       let busy = false;
 
       /** @type {null | (() => void)} */
@@ -292,13 +297,9 @@ export class BeforeHandshake {
       return {
         update(update) {
           const v = getConnectionAndInitializeResult(update.state);
+          const resolve = resolver(update.state);
 
           if (v && !v[1] && !busy) {
-            const resolve = resolver(update.state);
-            if (!resolve) {
-              throw new Error("Resolve is unavailable");
-            }
-
             if (cleanup) {
               cleanup();
               cleanup = null;
