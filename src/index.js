@@ -21,6 +21,10 @@ import textDocumentSyncClientCapabilities, {
 import documentLinkClientCapabilities from "./documentLinkClientCapabilities";
 import documentSymbolClientCapabilities from "./documentSymbolClientCapabilities";
 import hoverClientCapabilities from "./hoverClientCapabilities";
+import declarationClientCapabilities from "./declarationClientCapabilities";
+import definitionClientCapabilities from "./definitionClientCapabilities";
+import typeDefinitionClientCapabilities from "./typeDefinitionClientCapabilities";
+import implementationClientCapabilities from "./implementationClientCapabilities";
 
 new EditorView({
   doc: String.raw`#include <stdio.h>
@@ -51,6 +55,10 @@ int main() {
     documentLinkClientCapabilities(),
     documentSymbolClientCapabilities(),
     hoverClientCapabilities(),
+    declarationClientCapabilities(),
+    definitionClientCapabilities(),
+    typeDefinitionClientCapabilities(),
+    implementationClientCapabilities(),
 
     // LSP configurations
     initializeParams.of({

@@ -8,6 +8,7 @@ import {
   cmPositionToLsp,
   getValueIfNeedsRefresh,
   logMissingField,
+  mixin,
 } from "./utils";
 import { hoverable } from "./hoverable";
 import { providable } from "./providable";
@@ -16,11 +17,12 @@ export class Hover extends hoverable() {
   /**
    *
    * @param {import("@codemirror/state").EditorState} state
+   * @param {string} [hint]
    */
-  static value(state) {
+  static value(state, hint) {
     const pos = state.field(Hover.state, false);
     if (pos === undefined) {
-      logMissingField("Hover.state");
+      logMissingField("Hover.state", hint);
     } else if (isNaN(pos)) {
       return null;
     }
@@ -28,24 +30,38 @@ export class Hover extends hoverable() {
   }
 }
 
-export class HoverProvider extends providable(
-  "textDocument/hover",
-  (r) => r || null,
-) {
-  /**
-   *
-   * @param {import("@codemirror/state").EditorState} state
-   * @returns
-   */
-  static value(state) {
-    const response = state.field(HoverProvider.state, false);
-    if (response === undefined) {
-      logMissingField("HoverProvider.state");
-    }
-    return response;
-  }
-
-  pos = NaN;
+//
+// If there's a failure to mixin the *hoverProviderMixin*, it's helpful to use the following snippet
+// in the target scope to inspect the signature produced by Typescript for the 'foo' function.
+//
+// class A extends providable("textDocument/XXX", (r) => r || null) {}
+//
+// /**
+//  * @typedef B
+//  * @type {typeof hoverProviderMixin}
+//  */
+// /**
+//  * @typedef A1
+//  * @type {import("./utils").Intersect<A, B>}
+//  */
+// /**
+//  * @typedef A2
+//  * @type {import("./utils").Intersect<B, A>}
+//  */
+// /**
+//  * @typedef A3
+//  * @type {import("./utils").EqualThen<A1, A2, boolean>}
+//  */
+// /**
+//  *
+//  * @param {A1} a1
+//  * @param {A2} a2
+//  * @param {A3} a3
+//  */
+// function foo(a1, a2, a3) { }
+//
+export const hoverProviderMixin = {
+  pos: NaN,
 
   /**
    *
@@ -53,14 +69,11 @@ export class HoverProvider extends providable(
    * @returns
    */
   params(update) {
-    if (isNaN(this.pos)) {
-      throw new Error("Invalid pos");
-    }
     return {
-      textDocument: update.state.field(textDocument),
+      textDocument: { uri: update.state.field(textDocument).uri },
       position: cmPositionToLsp(this.pos, update.view.state.doc),
     };
-  }
+  },
 
   /**
    *
@@ -75,8 +88,13 @@ export class HoverProvider extends providable(
 
     this.pos = pos;
     return true;
-  }
-}
+  },
+};
+
+export class HoverProvider extends mixin(
+  providable("textDocument/hover", (r) => r || null),
+  hoverProviderMixin,
+) {}
 
 export const hover = ViewPlugin.fromClass(Hover, Hover.spec);
 

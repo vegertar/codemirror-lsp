@@ -16,6 +16,10 @@ const providableCapabilities = /** @type {const} */ ({
   "documentLink/resolve": "documentLinkProvider",
   "textDocument/documentSymbol": "documentSymbolProvider",
   "textDocument/hover": "hoverProvider",
+  "textDocument/declaration": "declarationProvider",
+  "textDocument/definition": "definitionProvider",
+  "textDocument/typeDefinition": "typeDefinitionProvider",
+  "textDocument/implementation": "implementationProvider",
 });
 
 /**
@@ -59,10 +63,62 @@ const providableCapabilities = /** @type {const} */ ({
  */
 
 /**
+ * @typedef DeclarationRequest
+ * @type {import("vscode-languageserver-protocol").DeclarationParams}
+ */
+
+/**
+ * @typedef DeclarationResponse
+ * @type {import("vscode-languageserver-types").Location |
+ * import("vscode-languageserver-types").Location[] |
+ * import("vscode-languageserver-types").LocationLink[] | null}
+ */
+
+/**
+ * @typedef DefinitionRequest
+ * @type {import("vscode-languageserver-protocol").DefinitionParams}
+ */
+
+/**
+ * @typedef DefinitionResponse
+ * @type {import("vscode-languageserver-types").Location |
+ * import("vscode-languageserver-types").Location[] |
+ * import("vscode-languageserver-types").LocationLink[] | null}
+ */
+
+/**
+ * @typedef TypeDefinitionRequest
+ * @type {import("vscode-languageserver-protocol").TypeDefinitionParams}
+ */
+
+/**
+ * @typedef TypeDefinitionResponse
+ * @type {import("vscode-languageserver-types").Location |
+ * import("vscode-languageserver-types").Location[] |
+ * import("vscode-languageserver-types").LocationLink[] | null}
+ */
+
+/**
+ * @typedef ImplementationRequest
+ * @type {import("vscode-languageserver-protocol").ImplementationParams}
+ */
+
+/**
+ * @typedef ImplementationResponse
+ * @type {import("vscode-languageserver-types").Location |
+ * import("vscode-languageserver-types").Location[] |
+ * import("vscode-languageserver-types").LocationLink[] | null}
+ */
+
+/**
  * @typedef {T extends "textDocument/documentLink" ? LinkRequest :
  * T extends "documentLink/resolve" ? LinkResolveRequest :
  * T extends "textDocument/documentSymbol" ? SymbolRequest :
- * T extends "textDocument/hover" ? HoverRequest : never} ProvidableRequest<T>
+ * T extends "textDocument/hover" ? HoverRequest :
+ * T extends "textDocument/declaration" ? DeclarationRequest :
+ * T extends "textDocument/definition" ? DefinitionRequest :
+ * T extends "textDocument/typeDefinition" ? TypeDefinitionRequest :
+ * T extends "textDocument/implementation" ? ImplementationRequest : never} ProvidableRequest<T>
  * @template T
  */
 
@@ -70,7 +126,11 @@ const providableCapabilities = /** @type {const} */ ({
  * @typedef {T extends "textDocument/documentLink" ? LinkResponse :
  * T extends "documentLink/resolve" ? LinkResolveResponse :
  * T extends "textDocument/documentSymbol" ? SymbolResponse :
- * T extends "textDocument/hover" ? HoverResponse : never} ProvidableResponse<T>
+ * T extends "textDocument/hover" ? HoverResponse :
+ * T extends "textDocument/declaration" ? DeclarationResponse :
+ * T extends "textDocument/definition" ? DefinitionResponse :
+ * T extends "textDocument/typeDefinition" ? TypeDefinitionResponse :
+ * T extends "textDocument/implementation" ? ImplementationResponse : never} ProvidableResponse<T>
  * @template T
  */
 

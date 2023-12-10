@@ -195,7 +195,44 @@ export function binarySearch(array, item, f, first, last) {
 /**
  *
  * @param {string} name
+ * @param {string} [hint]
  */
-export function logMissingField(name) {
-  console.debug("The extension is missing:", name);
+export function logMissingField(name, hint) {
+  console.warn("The extension %s is missing:", name, hint);
+}
+
+/**
+ * @typedef {Omit<A, keyof B>} Diff<A, B>
+ * @template A, B
+ */
+
+/**
+ * @typedef {Diff<A, Diff<A, B>>} Intersect<A, B>
+ * @template A, B
+ */
+
+/**
+ * @typedef {X extends Y ? Y extends X ? Z : never : never} EqualThen<X, Y, Z>
+ * @template X, Y, Z
+ */
+
+/**
+ * @typedef {EqualThen<Intersect<InstanceType<T>, U>, Intersect<U, InstanceType<T>>,
+ *  {new(...args: any[]): Diff<InstanceType<T>, U> & U} & T>}
+ *  MixinType<T extends ClassType, U>
+ * @template {new (...args: any[]) => {}} T
+ * @template U
+ */
+
+/**
+ * @template {new (...args: any[]) => {}} T
+ * @template U
+ * @param {T} t
+ * @param {U} v
+ * @returns {MixinType<T, U>}
+ */
+export function mixin(t, v) {
+  Object.assign(t.prototype, v);
+  // @ts-ignore
+  return t;
 }
