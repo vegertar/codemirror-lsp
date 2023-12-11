@@ -1,6 +1,6 @@
 {
   "include": ["src/**/*"],
-  "exclude": ["node_modules"],
+  "exclude": ["node_modules", "src/ui/components"],
   "compilerOptions": {
     "paths": {
       "@components": ["./src/ui/components/dist/index.d.ts"]

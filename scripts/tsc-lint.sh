@@ -11,7 +11,6 @@ for file in "$@"; do
   echo "    \"$file\"," >> $TMP
 done
 cat >>$TMP <<EOF
-    "unused"
   ]
 }
 EOF

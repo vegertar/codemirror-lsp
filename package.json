@@ -5,6 +5,7 @@
   "license": "MIT",
   "private": true,
   "scripts": {
+    "preinstall": "cd src/ui/components && npm install",
     "build": "webpack",
     "start": "webpack serve --open --mode=development --static-directory=dist",
     "server": "node src/server.mjs",
