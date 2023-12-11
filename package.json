@@ -19,6 +19,7 @@
     "husky": "^8.0.3",
     "lint-staged": "^15.1.0",
     "prettier": "3.1.0",
+    "source-map-loader": "^4.0.1",
     "typescript": "^5.2.2",
     "vscode-languageserver-protocol": "^3.17.5",
     "vscode-languageserver-types": "^3.17.5",
@@ -36,8 +37,8 @@
     "ws": "^8.14.2"
   },
   "lint-staged": {
-    "*.?(m)js": [
-      "tsc --noEmit --resolveJsonModule --esModuleInterop --allowJs --checkJs",
+    "!(*index|*.config).?(m)js": [
+      "scripts/tsc-lint.sh",
       "eslint",
       "prettier --write"
     ],

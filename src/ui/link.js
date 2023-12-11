@@ -41,7 +41,7 @@ import { binarySearch, compareRange, lspRangeToCm } from "../utils";
 function createDocumentLinkState(links, doc) {
   const decorations = Decoration.set(
     links.map((link, i) =>
-      Decoration.mark({ class: "cm-linkRange", i }).range(
+      Decoration.mark({ class: "cm-lsp-link", i }).range(
         ...lspRangeToCm(link.range, doc),
       ),
     ),
@@ -189,7 +189,7 @@ export const documentLink = StateField.define({
 });
 
 export const baseTheme = EditorView.baseTheme({
-  ".cm-linkRange": {
+  ".cm-lsp-link": {
     textDecoration: "underline 1px",
   },
 });

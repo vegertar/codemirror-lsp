@@ -248,7 +248,27 @@ export function providable(method, stateCreate, stateUpdate) {
     dispatch({ view }, response) {
       view.dispatch({
         effects: Providing.effect.of(response),
+        annotations: this.annotations(response),
       });
+    }
+
+    /**
+     *
+     * @returns {import("@codemirror/state").TransactionSpec['annotations']}
+     * @param {ProvidableResponse<T>} response
+     */
+    // eslint-disable-next-line no-unused-vars
+    annotations(response) {
+      return undefined;
+    }
+
+    /**
+     *
+     * @param {ProvidableResponse<T>} response
+     * @returns {ProvidableResponse<T>}
+     */
+    touch(response) {
+      return response;
     }
 
     /**
@@ -260,7 +280,7 @@ export function providable(method, stateCreate, stateUpdate) {
     // eslint-disable-next-line no-unused-vars
     refresh(update, c, r) {
       this.sendRequest(c, this.params(update))
-        .then((result) => this.dispatch(update, result))
+        .then((result) => this.dispatch(update, this.touch(result)))
         .catch(console.error);
     }
 

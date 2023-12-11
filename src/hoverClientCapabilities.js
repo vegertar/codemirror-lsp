@@ -89,6 +89,18 @@ export const hoverProviderMixin = {
     this.pos = pos;
     return true;
   },
+
+  /**
+   * Relate the current hover position to the response.
+   * @param {any} response
+   * @returns {any} The modified response with the hover position tied.
+   */
+  touch(response) {
+    if (response) {
+      response.pos = this.pos;
+    }
+    return response;
+  },
 };
 
 export class HoverProvider extends mixin(

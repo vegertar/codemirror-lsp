@@ -26,27 +26,17 @@ import { getLastValueFromTransaction } from "./utils";
  */
 export function promisable(facet, effect) {
   return class Promising {
-    /** @type {StateField<PromisingState<T>>} */
     static state = StateField.define({
+      /** @returns {PromisingState<T>} */
       create() {
-        /** @type {Resolve<T>} */
-        let resolve;
-        /** @type {Reject<any>} */
-        let reject;
-
-        /** @type {Promise<T>} */
+        let resolve, reject;
         const promise = new Promise((r0, r1) => {
           resolve = r0;
           reject = r1;
         });
 
-        return [
-          promise,
-          // @ts-ignore
-          resolve,
-          // @ts-ignore
-          reject,
-        ];
+        // @ts-ignore
+        return [promise, resolve, reject];
       },
       update(value, tr) {
         if (getLastValueFromTransaction(tr, effect) !== undefined) {
@@ -55,7 +45,6 @@ export function promisable(facet, effect) {
         }
         return value;
       },
-
       provide: (f) => facet.from(f, (value) => value[0]),
     });
 
