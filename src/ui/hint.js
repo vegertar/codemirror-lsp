@@ -2,35 +2,19 @@
 
 import { Facet } from "@codemirror/state";
 import { showTooltip } from "@codemirror/view";
-import * as components from "@components";
+import { HintSet } from "codemirror-lsp-components";
 
 import { Hover, HoverProvider } from "../hoverClientCapabilities";
 import { documentLink } from "./link";
 
 /**
- * @typedef DocumentLinkHint
- * @type {{
- *   type: "document-link",
- *   value: import("vscode-languageserver-types").DocumentLink,
- * }}
- */
-
-/**
- * @typedef HoverHint
- * @type {{
- *  type: "hover",
- *  value: import("vscode-languageserver-types").Hover,
- * }}
- */
-
-/**
- * @typedef Hint
- * @type {DocumentLinkHint | HoverHint}
+ * @typedef Hints
+ * @type {NonNullable<import("codemirror-lsp-components/dist/HintSet.svelte").HintSetProps['hints']>}
  */
 
 /**
  * Facet to which an extension can add a value to display a tooltip at the mouse hover position.
- * @type {Facet<Hint | null>}
+ * @type {Facet<Hints[0] | null>}
  */
 export const hint = Facet.define();
 
@@ -75,7 +59,7 @@ export class HintView {
    */
   // eslint-disable-next-line no-unused-vars
   mount(view) {
-    this.hint = new components.Hint({ target: this.dom });
+    this.hints = new HintSet({ target: this.dom });
   }
 
   /**
@@ -83,8 +67,8 @@ export class HintView {
    * @param {import("@codemirror/view").ViewUpdate} update
    */
   update(update) {
-    this.hint?.$set({
-      hints: /** @type {Hint[]} */ (update.state.facet(hint).filter((x) => x)),
+    this.hints?.$set({
+      hints: /** @type {Hints} */ (update.state.facet(hint).filter((x) => x)),
     });
   }
 
@@ -92,7 +76,7 @@ export class HintView {
    * Implementation of TooltipView
    */
   destroy() {
-    this.hint?.$destroy();
+    this.hints?.$destroy();
   }
 
   /**
@@ -119,7 +103,7 @@ function createDocumentLinkHint() {
   return hint.compute([Hover.state, documentLink], (state) => {
     const pos = Hover.value(state, "required by document link hint");
     const result = pos != null && state.field(documentLink).find(pos);
-    return result ? { type: "document-link", value: result.link } : null;
+    return result ? ["DocumentLink", result.link] : null;
   });
 }
 
@@ -128,7 +112,7 @@ function createHoverHint() {
     const pos = Hover.value(state, "required by hover hint");
     const response = state.field(HoverProvider.state);
     if (response && response.pos === pos) {
-      return { type: "hover", value: response };
+      return ["Hover", response];
     }
     return null;
   });

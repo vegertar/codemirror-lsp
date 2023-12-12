@@ -1,10 +1,7 @@
 {
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "src/ui/components"],
+  "exclude": ["node_modules"],
   "compilerOptions": {
-    "paths": {
-      "@components": ["./src/ui/components/dist/index.d.ts"]
-    },
     "noEmit": true,
     "resolveJsonModule": true,
     "esModuleInterop": true,

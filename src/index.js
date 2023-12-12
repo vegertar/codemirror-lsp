@@ -63,6 +63,13 @@ int main() {
     // LSP configurations
     initializeParams.of({
       rootUri: "file:///home/whom/codemirror-lsp/ls/example/c",
+      capabilities: {
+        textDocument: {
+          hover: {
+            contentFormat: ["markdown", "plaintext"],
+          },
+        },
+      },
     }),
     serverUri.of(`ws://${location.host}/ls/example/c`),
     textDocument.init(() => ({

@@ -1,7 +1,5 @@
 /* eslint-env node */
 
-const path = require("path");
-
 module.exports = {
   module: {
     rules: [
@@ -11,14 +9,6 @@ module.exports = {
         use: ["source-map-loader"],
       },
     ],
-  },
-  resolve: {
-    alias: {
-      "@components$": path.resolve(
-        __dirname,
-        "src/ui/components/dist-js/index.js",
-      ),
-    },
   },
   devServer: {
     proxy: {
