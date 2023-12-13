@@ -6,6 +6,7 @@ import { HintSet } from "codemirror-lsp-components";
 
 import { Hover, HoverProvider } from "../hoverClientCapabilities";
 import { documentLink } from "./link";
+import { lifecycleGuard } from "../utils";
 
 /**
  * @typedef Hints
@@ -25,8 +26,19 @@ export class HintView {
    */
   // eslint-disable-next-line no-unused-vars
   constructor(view) {
-    this.dom = document.createElement("div");
+    this.dom = lifecycleGuard(this);
     this.dom.classList.add("cm-lsp-hint");
+  }
+
+  connectedCallback() {
+    this.hints = new HintSet({ target: this.dom });
+  }
+
+  disconnectedCallback() {
+    if (this.hints) {
+      this.hints.$destroy();
+      this.hints = null;
+    }
   }
 
   /**
@@ -55,28 +67,12 @@ export class HintView {
 
   /**
    * Implementation of TooltipView
-   * @param {import("@codemirror/view").EditorView} view
-   */
-  // eslint-disable-next-line no-unused-vars
-  mount(view) {
-    this.hints = new HintSet({ target: this.dom });
-  }
-
-  /**
-   * Implementation of TooltipView
    * @param {import("@codemirror/view").ViewUpdate} update
    */
   update(update) {
     this.hints?.$set({
       hints: /** @type {Hints} */ (update.state.facet(hint).filter((x) => x)),
     });
-  }
-
-  /**
-   * Implementation of TooltipView
-   */
-  destroy() {
-    this.hints?.$destroy();
   }
 
   /**

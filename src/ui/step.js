@@ -1,11 +1,12 @@
 // @ts-check
 
 import { StateField } from "@codemirror/state";
+import { ViewPlugin } from "@codemirror/view";
 
 class Tree {
   static count = 0;
 
-  /** @type {Map<number, [node: import("@codemirror/state").EditorState, parent: number, ...children: number[]]>} */
+  /** @type {Map<number, [node: import("@codemirror/state").EditorState, parent: number]>} */
   nodes = new Map();
 
   /**
@@ -15,13 +16,21 @@ class Tree {
    * @param {number} prevNumber
    */
   insert(currState, currNumber, prevNumber) {
-    this.nodes.set(currNumber, [currState, prevNumber]);
-    const parent = this.nodes.get(prevNumber);
-    if (parent) {
-      parent.push(currNumber);
+    if (!this.nodes.has(currNumber)) {
+      this.nodes.set(currNumber, [currState, prevNumber]);
     }
 
     return this;
+  }
+
+  strata() {
+    /** @type {[root: {id: 1}, ...descendants: {id: number, parentId: number}[]]} */
+    const data = [{ id: 1 }];
+    this.nodes.forEach((value, id) => {
+      const parentId = value[1];
+      data.push({ id, parentId });
+    });
+    return data;
   }
 }
 
@@ -47,6 +56,14 @@ export const stepTree = StateField.define({
   },
 });
 
+export const stepView = ViewPlugin.define(() => {
+  return {
+    update() {
+      console.log(tree.strata());
+    },
+  };
+});
+
 export default function () {
-  return [stepNumber, stepTree];
+  return [stepNumber, stepTree, stepView];
 }

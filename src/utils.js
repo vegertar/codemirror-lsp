@@ -236,3 +236,38 @@ export function mixin(t, v) {
   // @ts-ignore
   return t;
 }
+
+/**
+ * @typedef LifecycleCallbacks
+ * @type {{
+ *  connectedCallback?: () => void;
+ *  disconnectedCallback?: () => void;
+ * }}
+ */
+
+class LifecycleGuardElement extends HTMLElement {
+  /** @type {LifecycleCallbacks | undefined} */
+  lifeCycleCallbacks;
+
+  connectedCallback() {
+    this.lifeCycleCallbacks?.connectedCallback?.();
+  }
+
+  disconnectedCallback() {
+    this.lifeCycleCallbacks?.disconnectedCallback?.();
+  }
+}
+
+window.customElements.define("lifecycle-guard", LifecycleGuardElement);
+
+/**
+ *
+ * @param {LifecycleCallbacks} lifecycleCallbacks
+ */
+export function lifecycleGuard(lifecycleCallbacks) {
+  const element = /** @type {LifecycleGuardElement} */ (
+    document.createElement("lifecycle-guard")
+  );
+  element.lifeCycleCallbacks = lifecycleCallbacks;
+  return element;
+}
