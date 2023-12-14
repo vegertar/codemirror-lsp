@@ -1,82 +1,27 @@
 // @ts-check
 
-import { EditorView, basicSetup } from "codemirror";
-import { EditorState } from "@codemirror/state";
-import { cpp } from "@codemirror/lang-cpp";
+export * from "./utils";
+export * from "./serverUri";
+export * from "./client";
+export * from "./trace";
+export * from "./publishDiagnosticsClientCapabilities";
+export * from "./textDocumentSyncClientCapabilities";
+export * from "./documentLinkClientCapabilities";
+export * from "./documentSymbolClientCapabilities";
+export * from "./hoverClientCapabilities";
+export * from "./declarationClientCapabilities";
+export * from "./definitionClientCapabilities";
+export * from "./typeDefinitionClientCapabilities";
+export * from "./implementationClientCapabilities";
 
-import lint from "./ui/lint";
-import link from "./ui/link";
-import file from "./ui/file";
-import step from "./ui/step";
-import page from "./ui/page";
-import hint from "./ui/hint";
-
-import { serverUri } from "./serverUri";
-import client, { initializeParams } from "./client";
-import trace from "./trace";
-import publishDiagnosticsClientCapabilities from "./publishDiagnosticsClientCapabilities";
-import textDocumentSyncClientCapabilities, {
-  textDocument,
-} from "./textDocumentSyncClientCapabilities";
-import documentLinkClientCapabilities from "./documentLinkClientCapabilities";
-import documentSymbolClientCapabilities from "./documentSymbolClientCapabilities";
-import hoverClientCapabilities from "./hoverClientCapabilities";
-import declarationClientCapabilities from "./declarationClientCapabilities";
-import definitionClientCapabilities from "./definitionClientCapabilities";
-import typeDefinitionClientCapabilities from "./typeDefinitionClientCapabilities";
-import implementationClientCapabilities from "./implementationClientCapabilities";
-
-new EditorView({
-  doc: String.raw`#include <stdio.h>
-#include <stdlib.h>
-
-int main() {
-  printf("Hello World\n");
-  exit(0);
-}`,
-  extensions: [
-    basicSetup,
-    EditorState.readOnly.of(true),
-    cpp(),
-
-    // UI based on LSP
-    lint(),
-    link(),
-    file(),
-    step(),
-    page(),
-    hint(),
-
-    // LSP implementations
-    client(),
-    trace("verbose"),
-    publishDiagnosticsClientCapabilities(),
-    textDocumentSyncClientCapabilities(),
-    documentLinkClientCapabilities(),
-    documentSymbolClientCapabilities(),
-    hoverClientCapabilities(),
-    declarationClientCapabilities(),
-    definitionClientCapabilities(),
-    typeDefinitionClientCapabilities(),
-    implementationClientCapabilities(),
-
-    // LSP configurations
-    initializeParams.of({
-      rootUri: "file:///home/whom/codemirror-lsp/ls/example/c",
-      capabilities: {
-        textDocument: {
-          hover: {
-            contentFormat: ["markdown", "plaintext"],
-          },
-        },
-      },
-    }),
-    serverUri.of(`ws://${location.host}/ls/example/c`),
-    textDocument.init(() => ({
-      uri: "file:///home/whom/codemirror-lsp/ls/example/c/hello-world.c",
-      languageId: "c",
-      version: 1,
-    })),
-  ],
-  parent: document.body,
-});
+export { default as client } from "./client";
+export { default as trace } from "./trace";
+export { default as publishDiagnosticsClientCapabilities } from "./publishDiagnosticsClientCapabilities";
+export { default as textDocumentSyncClientCapabilities } from "./textDocumentSyncClientCapabilities";
+export { default as documentLinkClientCapabilities } from "./documentLinkClientCapabilities";
+export { default as documentSymbolClientCapabilities } from "./documentSymbolClientCapabilities";
+export { default as hoverClientCapabilities } from "./hoverClientCapabilities";
+export { default as declarationClientCapabilities } from "./declarationClientCapabilities";
+export { default as definitionClientCapabilities } from "./definitionClientCapabilities";
+export { default as typeDefinitionClientCapabilities } from "./typeDefinitionClientCapabilities";
+export { default as implementationClientCapabilities } from "./implementationClientCapabilities";
