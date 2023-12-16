@@ -6,7 +6,7 @@ import { initializeParams } from "./client";
 import { textDocument } from "./textDocumentSyncClientCapabilities";
 import {
   cmPositionToLsp,
-  getValueIfNeedsRefresh,
+  getStateIfNeedsRefresh,
   logMissingField,
   mixin,
 } from "./utils";
@@ -81,7 +81,7 @@ export const hoverProviderMixin = {
    * @returns
    */
   needsRefresh(update) {
-    const pos = getValueIfNeedsRefresh(update, Hover.state, false);
+    const pos = getStateIfNeedsRefresh(update, Hover.state, false);
     if (pos === undefined || isNaN(pos)) {
       return false;
     }

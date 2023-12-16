@@ -2,7 +2,7 @@
 
 import { StateField, StateEffect } from "@codemirror/state";
 
-import { getLastValueFromTransaction, getValueIfNeedsRefresh } from "./utils";
+import { getLastValueFromTransaction, getStateIfNeedsRefresh } from "./utils";
 import { getConnectionAndInitializeResult, initializeResult } from "./client";
 import { TextDocumentSynchronization } from "./textDocumentSyncClientCapabilities";
 
@@ -210,14 +210,14 @@ export function providable(method, stateCreate, stateUpdate) {
     needsRefresh(update) {
       if (
         this.refreshAfterHandshake &&
-        !!getValueIfNeedsRefresh(update, initializeResult)
+        !!getStateIfNeedsRefresh(update, initializeResult)
       ) {
         return true;
       }
 
       if (
         this.refreshAfterSynchronization &&
-        !!getValueIfNeedsRefresh(
+        !!getStateIfNeedsRefresh(
           update,
           TextDocumentSynchronization.didVersion,
           false, // Allow the server’s ability to fulfill requests to be independent of TextDocumentSynchronization.

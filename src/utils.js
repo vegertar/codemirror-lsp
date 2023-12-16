@@ -95,11 +95,32 @@ export function cmPositionToLsp(pos, text) {
  * @param {[NonUndefinedStateField<T>] | [NonUndefinedStateField<T>, false]} args
  * @returns {T | undefined}
  */
-export function getValueIfNeedsRefresh({ state, startState }, ...args) {
+export function getStateIfNeedsRefresh({ state, startState }, ...args) {
   // @ts-ignore
   const oldValue = startState.field(...args);
   // @ts-ignore
   const newValue = state.field(...args);
+  return oldValue !== newValue ? newValue : undefined;
+}
+
+/**
+ * @typedef {import("@codemirror/state").Facet<T, U extends undefined ? never : U>} NonUndefinedFacet<T, U>
+ * @template T, U
+ */
+
+/**
+ * Examine if a refresh is needed by comparing the provided facet's old and new values.
+ * The new value is returned if true.
+ * @template T, U
+ * @param {{state: import("@codemirror/state").EditorState, startState: import("@codemirror/state").EditorState}} param0
+ * @param {NonUndefinedFacet<T, U>} facet
+ * @returns {U | undefined}
+ */
+export function getFacetIfNeedsRefresh({ state, startState }, facet) {
+  // @ts-ignore
+  const oldValue = startState.facet(facet);
+  // @ts-ignore
+  const newValue = state.facet(facet);
   return oldValue !== newValue ? newValue : undefined;
 }
 

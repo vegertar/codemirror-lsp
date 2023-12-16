@@ -4,7 +4,7 @@ import { ViewPlugin } from "@codemirror/view";
 import { produce } from "immer";
 
 import { initializeParams } from "./client";
-import { getValueIfNeedsRefresh } from "./utils";
+import { getStateIfNeedsRefresh } from "./utils";
 import { textDocument } from "./textDocumentSyncClientCapabilities";
 import { providable } from "./providable";
 
@@ -55,7 +55,7 @@ export class DocumentLinkResolver extends BaseDocumentLinkResolver {
 
   /** @type {BaseDocumentLinkResolver['needsRefresh']} */
   needsRefresh(update) {
-    const links = getValueIfNeedsRefresh(
+    const links = getStateIfNeedsRefresh(
       update,
       BaseDocumentLinkProvider.state,
     );

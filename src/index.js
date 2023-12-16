@@ -1,5 +1,8 @@
 // @ts-check
 
+export * from "./hoverable";
+export * from "./promisable";
+export * from "./providable";
 export * from "./utils";
 export * from "./serverUri";
 export * from "./client";

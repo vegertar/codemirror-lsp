@@ -78,13 +78,13 @@ export class TextDocumentSynchronization {
     },
   });
 
-  /** @type {0 | 1 | 2 | 3 | 4} 0: closed, 1: opening, 2: open, 3: changing, 4: closing */
+  /** @type {0 | 1 | 2 | 3 | 4 | 5} 0: closed, 1: opening, 2: open, 3: changing, 4: closing, 5: halt */
   didState = 0;
 
   /** @type {TextDocument | null} */
   didTextDocument = null;
 
-  /** @type {0 | 1 | 2} 0: nop, 1: prepare to reset, 3: resetting */
+  /** @type {0 | 1 | 2} 0: nop, 1: prepare to reset, 2: resetting */
   didReset = 0;
 
   /** @type {import("vscode-languageserver-protocol").TextDocumentSyncOptions} */
@@ -109,20 +109,19 @@ export class TextDocumentSynchronization {
    * @param {import("vscode-jsonrpc").MessageConnection} c
    * @param {import("vscode-languageserver-protocol").DidOpenTextDocumentParams} params
    */
-  didOpen(c, params) {
+  async didOpen(c, params) {
     this.didState = 1;
     this.didTextDocument = params.textDocument;
-    c.sendNotification("textDocument/didOpen", params).then(() => {
-      this.didState = 2;
-      this.did(params.textDocument.version);
-    });
+    await c.sendNotification("textDocument/didOpen", params);
+    this.didState = 2;
+    this.did(params.textDocument.version);
   }
 
   /**
    * @param {import("vscode-jsonrpc").MessageConnection} c
    * @param {import("vscode-languageserver-protocol").DidCloseTextDocumentParams} params
    */
-  didClose(c, params) {
+  async didClose(c, params) {
     if (this.pendingChanges.length) {
       throw new Error(
         `TODO: Notify the user that there are ${this.pendingChanges.length} pending changes. The file cannot be closed until these changes are synced.`,
@@ -130,22 +129,20 @@ export class TextDocumentSynchronization {
     }
 
     this.didState = 4;
-    c.sendNotification("textDocument/didClose", params).then(() => {
-      this.reset();
-      this.did(0);
-    });
+    await c.sendNotification("textDocument/didClose", params);
+    this.reset();
+    this.did(0);
   }
 
   /**
    * @param {import("vscode-jsonrpc").MessageConnection} c
    * @param {import("vscode-languageserver-protocol").DidChangeTextDocumentParams} params
    */
-  didChange(c, params) {
+  async didChange(c, params) {
     this.didState = 3;
-    c.sendNotification("textDocument/didChange", params).then(() => {
-      this.didState = 2;
-      this.did(params.textDocument.version);
-    });
+    await c.sendNotification("textDocument/didChange", params);
+    this.didState = 2;
+    this.did(params.textDocument.version);
   }
 
   /**
@@ -181,6 +178,13 @@ export class TextDocumentSynchronization {
    */
   checkReset(newTextDocument, c) {
     if (!this.didTextDocument) {
+      if (newTextDocument.uri && this.didState === 5) {
+        // Clear the halt state
+        this.didState = 0;
+      } else if (!newTextDocument.uri && this.didState === 0) {
+        // Assign the halt state
+        this.didState = 5;
+      }
       return;
     }
 
@@ -193,7 +197,7 @@ export class TextDocumentSynchronization {
       this.didReset = 1;
     }
 
-    if (this.didState === 2 && this.didReset === 1) {
+    if (this.didReset === 1) {
       this.didReset = 2;
       this.didClose(c, { textDocument: this.didTextDocument });
     }
@@ -279,7 +283,9 @@ export class TextDocumentSynchronization {
     const t = update.state.field(textDocument);
     this.checkReset(t, c);
 
-    if (this.didState === 4) {
+    if (this.didState === 5) {
+      console.debug("Halted");
+    } else if (this.didState === 4) {
       console.debug("Closing a document:", this.didTextDocument?.uri);
     } else if (this.didState === 0) {
       this.doOpen(update, t, c, r);
