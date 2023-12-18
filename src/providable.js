@@ -219,7 +219,7 @@ export function providable(method, stateCreate, stateUpdate) {
         this.refreshAfterSynchronization &&
         !!getStateIfNeedsRefresh(
           update,
-          TextDocumentSynchronization.didVersion,
+          TextDocumentSynchronization.version,
           false, // Allow the server’s ability to fulfill requests to be independent of TextDocumentSynchronization.
         )
       ) {

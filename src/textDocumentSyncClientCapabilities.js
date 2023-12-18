@@ -7,14 +7,22 @@ import { produce } from "immer";
 import {
   getConnectionAndInitializeResult,
   initializeParams,
-  initializeResultEffect,
+  initializeResult,
 } from "./client";
-import { cmPositionToLsp } from "./utils";
+import {
+  cmPositionToLsp,
+  getLastValueFromTransaction,
+  getStateIfNeedsRefresh,
+} from "./utils";
 
 /**
  * @typedef {Omit<import("vscode-languageserver-types").TextDocumentItem, "text">} TextDocument
  */
 
+/**
+ * @typedef {Omit<import("vscode-languageserver-protocol").DidChangeTextDocumentParams, "textDocument"> & {
+ * "textDocument": TextDocument}} DidChangeTextDocumentParams
+ */
 /** @type {import("@codemirror/state").StateEffectType<TextDocument['uri']>} */
 export const textDocumentUriEffect = StateEffect.define();
 
@@ -56,53 +64,254 @@ export class TextDocumentSynchronization {
    * Specially, 0 means not synced at all or did close.
    * @type {import("@codemirror/state").StateEffectType<number>}
    */
-  static didEffect = StateEffect.define();
+  static versionEffect = StateEffect.define();
+
+  /**
+   * @typedef SyncState
+   * @type {0 | 1 | 2 | 3 | 4 | 5}
+   */
+
+  static Closed = /** @type {SyncState} */ (0);
+  static Opening = /** @type {SyncState} */ (1);
+  static Open = /** @type {SyncState} */ (2);
+  static Changing = /** @type {SyncState} */ (3);
+  static Closing = /** @type {SyncState} */ (4);
+  static Halt = /** @type {SyncState} */ (5);
+
+  /** @type {import("@codemirror/state").StateEffectType<SyncState>} */
+  static stateEffect = StateEffect.define();
+
+  /** @type {import("@codemirror/state").StateEffectType<TextDocument | null>} */
+  static textDocumentEffect = StateEffect.define();
+
+  /** @type {import("@codemirror/state").StateEffectType<DidChangeTextDocumentParams[]>} */
+  static changeEffect = StateEffect.define();
 
   /**
    * The state field of the version number that the text document has had synchronizations up to.
    * Specially, 0 means not synced at all or did close.
    */
-  static didVersion = StateField.define({
+  static version = StateField.define({
     create() {
       return 0;
     },
     update(value, tr) {
-      for (const effect of tr.effects) {
-        if (effect.is(TextDocumentSynchronization.didEffect)) {
-          value = effect.value;
-        } else if (effect.is(initializeResultEffect)) {
-          value = 0;
-        }
+      if (getStateIfNeedsRefresh(tr, initializeResult) !== undefined) {
+        // The connection has reset
+        return 0;
       }
+
+      const v = getLastValueFromTransaction(
+        tr,
+        TextDocumentSynchronization.versionEffect,
+      );
+      if (v !== undefined) {
+        return v;
+      }
+
       return value;
     },
   });
 
-  /** @type {0 | 1 | 2 | 3 | 4 | 5} 0: closed, 1: opening, 2: open, 3: changing, 4: closing, 5: halt */
-  didState = 0;
+  static textDocument = StateField.define({
+    /** @return {TextDocument | null} */
+    create() {
+      return null;
+    },
+    update(value, tr) {
+      if (getStateIfNeedsRefresh(tr, initializeResult) !== undefined) {
+        // The connection has reset
+        return null;
+      }
 
-  /** @type {TextDocument | null} */
-  didTextDocument = null;
+      const v = getLastValueFromTransaction(
+        tr,
+        TextDocumentSynchronization.textDocumentEffect,
+      );
+      if (v !== undefined) {
+        return v;
+      }
 
-  /** @type {0 | 1 | 2} 0: nop, 1: prepare to reset, 2: resetting */
-  didReset = 0;
+      return value;
+    },
+  });
 
-  /** @type {import("vscode-languageserver-protocol").TextDocumentSyncOptions} */
-  syncOption = {};
+  static option = StateField.define({
+    /** @returns {import("vscode-languageserver-protocol").TextDocumentSyncOptions} */
+    create() {
+      return {};
+    },
+    update(value, tr) {
+      const r = getStateIfNeedsRefresh(tr, initializeResult);
+      if (r === undefined) {
+        // No changes
+        return value;
+      }
+      if (r === null) {
+        // The connection has reset
+        return {};
+      }
 
-  /** @type {import("vscode-languageserver-protocol").DidChangeTextDocumentParams[]} */
-  pendingChanges = [];
+      /** @type {import("vscode-languageserver-protocol").TextDocumentSyncOptions} */
+      const option = {};
+      const cap = r.capabilities.textDocumentSync;
+      if (typeof cap === "number") {
+        option.openClose = cap > 0;
+        option.change = cap;
+      } else if (cap) {
+        Object.assign(option, cap);
+      }
+      return option;
+    },
+  });
+
+  static state = StateField.define({
+    /** @returns {SyncState} */
+    create() {
+      return TextDocumentSynchronization.Closed;
+    },
+    update(value, tr) {
+      if (getStateIfNeedsRefresh(tr, initializeResult) !== undefined) {
+        // The connection has reset
+        return TextDocumentSynchronization.Closed;
+      }
+
+      const v = getLastValueFromTransaction(
+        tr,
+        TextDocumentSynchronization.stateEffect,
+      );
+      if (v !== undefined) {
+        return v;
+      }
+
+      const option = tr.state.field(TextDocumentSynchronization.option);
+      const doc = tr.state.field(TextDocumentSynchronization.textDocument);
+      const did = tr.state.field(TextDocumentSynchronization.version);
+      const { uri, languageId, version } = tr.state.field(textDocument);
+
+      switch (value) {
+        case TextDocumentSynchronization.Closed:
+          if (!uri) {
+            value = TextDocumentSynchronization.Halt;
+          } else if (option.openClose) {
+            value = TextDocumentSynchronization.Opening;
+          }
+          break;
+        case TextDocumentSynchronization.Open:
+          if (!doc || !did) {
+            throw new Error("Inconsistent state");
+          } else if (doc.uri !== uri || doc.languageId !== languageId) {
+            value = TextDocumentSynchronization.Closing;
+          } else if (did < version && option.change) {
+            value = TextDocumentSynchronization.Changing;
+          }
+          break;
+        case TextDocumentSynchronization.Halt:
+          if (uri) {
+            value = TextDocumentSynchronization.Closed;
+          }
+          break;
+      }
+
+      return value;
+    },
+  });
+
+  static changes = StateField.define({
+    /** @returns {DidChangeTextDocumentParams[]} */
+    create() {
+      return [];
+    },
+    update(value, tr) {
+      if (getStateIfNeedsRefresh(tr, initializeResult) !== undefined) {
+        // The connection has reset
+        return [];
+      }
+
+      const v = getLastValueFromTransaction(
+        tr,
+        TextDocumentSynchronization.changeEffect,
+      );
+      if (v !== undefined) {
+        return v;
+      }
+
+      const state = tr.state.field(TextDocumentSynchronization.state);
+
+      if (
+        state !== TextDocumentSynchronization.Opening &&
+        state !== TextDocumentSynchronization.Changing
+      ) {
+        // Out of responsibility
+        return value;
+      }
+
+      const option = tr.state.field(TextDocumentSynchronization.option);
+      /** @type {import("vscode-languageserver-protocol").TextDocumentContentChangeEvent[]} */
+      const contentChanges = [];
+
+      if (option.change === 2) {
+        tr.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
+          const start = cmPositionToLsp(fromA, tr.startState.doc);
+          const end = cmPositionToLsp(toA, tr.startState.doc);
+          contentChanges.push({
+            range: { start, end },
+            text: inserted.toString(),
+          });
+        });
+      } else if (tr.docChanged) {
+        contentChanges.push({ text: tr.state.doc.toString() });
+      }
+
+      return produce(value, (draft) => {
+        if (contentChanges.length) {
+          if (option.change === 1) {
+            // Reset if sync in full
+            draft.length = 0;
+          }
+          draft.push({
+            textDocument: tr.state.field(textDocument),
+            contentChanges,
+          });
+        }
+
+        const version = tr.state.field(TextDocumentSynchronization.version);
+        if (version > 0 && draft.length) {
+          // Remove outdated changes
+          while (draft[0].textDocument.version <= version) {
+            draft.shift();
+          }
+        }
+        const doc = tr.state.field(TextDocumentSynchronization.textDocument);
+        if (doc) {
+          const i = draft.findIndex(
+            (v) =>
+              v.textDocument.uri !== doc.uri ||
+              v.textDocument.languageId !== doc.languageId,
+          );
+          if (i !== -1) {
+            // Remove incompatible changes
+            draft.splice(i);
+          }
+        }
+      });
+    },
+  });
+
+  /** @type {import("@codemirror/view").PluginSpec<TextDocumentSynchronization>} */
+  static spec = {
+    provide: () => [
+      TextDocumentSynchronization.version,
+      TextDocumentSynchronization.textDocument,
+      TextDocumentSynchronization.option,
+      TextDocumentSynchronization.state,
+      TextDocumentSynchronization.changes,
+    ],
+  };
 
   /** @param {import("@codemirror/view").EditorView} view */
   constructor(view) {
     this.view = view;
-  }
-
-  /** @param {number} version */
-  did(version) {
-    this.view.dispatch({
-      effects: TextDocumentSynchronization.didEffect.of(version),
-    });
   }
 
   /**
@@ -110,28 +319,67 @@ export class TextDocumentSynchronization {
    * @param {import("vscode-languageserver-protocol").DidOpenTextDocumentParams} params
    */
   async didOpen(c, params) {
-    this.didState = 1;
-    this.didTextDocument = params.textDocument;
-    await c.sendNotification("textDocument/didOpen", params);
-    this.didState = 2;
-    this.did(params.textDocument.version);
+    try {
+      await c.sendNotification("textDocument/didOpen", params);
+    } catch (err) {
+      console.error(err);
+      // Restore to Opening state
+      return this.view.dispatch({
+        effects: TextDocumentSynchronization.stateEffect.of(
+          TextDocumentSynchronization.Opening,
+        ),
+      });
+    }
+
+    const { uri, languageId, version } = params.textDocument;
+    this.view.dispatch({
+      effects: [
+        TextDocumentSynchronization.stateEffect.of(
+          TextDocumentSynchronization.Open,
+        ),
+        TextDocumentSynchronization.textDocumentEffect.of({
+          uri,
+          languageId,
+          version,
+        }),
+        TextDocumentSynchronization.versionEffect.of(version),
+      ],
+    });
   }
 
   /**
    * @param {import("vscode-jsonrpc").MessageConnection} c
    * @param {import("vscode-languageserver-protocol").DidCloseTextDocumentParams} params
+   * @param {import("vscode-languageserver-protocol").DidChangeTextDocumentParams | null} [refresh]
    */
-  async didClose(c, params) {
-    if (this.pendingChanges.length) {
-      throw new Error(
-        `TODO: Notify the user that there are ${this.pendingChanges.length} pending changes. The file cannot be closed until these changes are synced.`,
-      );
+  async didClose(c, params, refresh) {
+    try {
+      await Promise.all([
+        refresh
+          ? c.sendNotification("textDocument/didChange", refresh)
+          : Promise.resolve(),
+        c.sendNotification("textDocument/didClose", params),
+      ]);
+    } catch (err) {
+      console.log(err);
+      // Restore to Open state
+      return this.view.dispatch({
+        effects: TextDocumentSynchronization.stateEffect.of(
+          TextDocumentSynchronization.Open,
+        ),
+      });
     }
 
-    this.didState = 4;
-    await c.sendNotification("textDocument/didClose", params);
-    this.reset();
-    this.did(0);
+    this.view.dispatch({
+      effects: [
+        TextDocumentSynchronization.stateEffect.of(
+          TextDocumentSynchronization.Closed,
+        ),
+        TextDocumentSynchronization.changeEffect.of([]),
+        TextDocumentSynchronization.textDocumentEffect.of(null),
+        TextDocumentSynchronization.versionEffect.of(0),
+      ],
+    });
   }
 
   /**
@@ -139,92 +387,42 @@ export class TextDocumentSynchronization {
    * @param {import("vscode-languageserver-protocol").DidChangeTextDocumentParams} params
    */
   async didChange(c, params) {
-    this.didState = 3;
-    await c.sendNotification("textDocument/didChange", params);
-    this.didState = 2;
-    this.did(params.textDocument.version);
-  }
-
-  /**
-   * @param {import("vscode-jsonrpc").MessageConnection} c
-   */
-  didPendingChanges(c) {
-    const n = this.pendingChanges.length;
-    if (n) {
-      /** @type {import("vscode-languageserver-protocol").TextDocumentContentChangeEvent[]} */
-      const contentChanges = [];
-      for (const item of this.pendingChanges) {
-        contentChanges.push(...item.contentChanges);
-      }
-      this.didChange(c, {
-        textDocument: this.pendingChanges[n - 1].textDocument,
-        contentChanges,
+    try {
+      await c.sendNotification("textDocument/didChange", params);
+    } catch (err) {
+      console.error(err);
+      // Restore to Open state
+      return this.view.dispatch({
+        effects: TextDocumentSynchronization.stateEffect.of(
+          TextDocumentSynchronization.Open,
+        ),
       });
     }
-  }
 
-  reset() {
-    this.didState = 0;
-    this.didTextDocument = null;
-    this.didReset = 0;
-    this.syncOption = {};
-    this.pendingChanges.length = 0;
-  }
-
-  /**
-   *
-   * @param {TextDocument} newTextDocument
-   * @param {import("vscode-jsonrpc").MessageConnection} c
-   */
-  checkReset(newTextDocument, c) {
-    if (!this.didTextDocument) {
-      if (newTextDocument.uri && this.didState === 5) {
-        // Clear the halt state
-        this.didState = 0;
-      } else if (!newTextDocument.uri && this.didState === 0) {
-        // Assign the halt state
-        this.didState = 5;
-      }
-      return;
-    }
-
-    // By the specification, it's required to close the old document first.
-    if (
-      this.didReset === 0 &&
-      (this.didTextDocument.uri !== newTextDocument.uri ||
-        this.didTextDocument.languageId !== newTextDocument.languageId)
-    ) {
-      this.didReset = 1;
-    }
-
-    if (this.didReset === 1) {
-      this.didReset = 2;
-      this.didClose(c, { textDocument: this.didTextDocument });
-    }
+    this.view.dispatch({
+      effects: [
+        TextDocumentSynchronization.stateEffect.of(
+          TextDocumentSynchronization.Open,
+        ),
+        TextDocumentSynchronization.versionEffect.of(
+          params.textDocument.version,
+        ),
+      ],
+    });
   }
 
   /**
    *
    * @param {import("@codemirror/view").ViewUpdate} update
-   * @param {TextDocument} textDocument
-   * @param {import("vscode-jsonrpc").MessageConnection} c
-   * @param {import("vscode-languageserver-protocol").InitializeResult} r
    * @returns
    */
-  doOpen(update, textDocument, c, r) {
-    const cap = r.capabilities.textDocumentSync;
-    if (typeof cap === "number") {
-      this.syncOption.openClose = cap > 0;
-      this.syncOption.change = cap;
-    } else if (cap) {
-      Object.assign(this.syncOption, cap);
-    }
-
-    if (this.syncOption.openClose) {
-      this.didOpen(c, {
+  doOpen({ state }) {
+    const v = getConnectionAndInitializeResult(state);
+    if (v?.[1]) {
+      this.didOpen(v[0], {
         textDocument: {
-          ...textDocument,
-          text: update.state.doc.toString(),
+          ...state.field(textDocument),
+          text: state.doc.toString(),
         },
       });
     }
@@ -232,39 +430,51 @@ export class TextDocumentSynchronization {
 
   /**
    * @param {import("@codemirror/view").ViewUpdate} update
-   * @param {TextDocument} textDocument
-   * @param {import("vscode-jsonrpc").MessageConnection} c
    */
-  doChange(update, textDocument, c) {
+  doClose({ state }) {
+    const v = getConnectionAndInitializeResult(state);
+    const doc = state.field(TextDocumentSynchronization.textDocument);
+    if (!doc) {
+      throw new Error("Inconsistent state");
+    }
+
+    if (v?.[1]) {
+      this.didClose(v[0], { textDocument: doc }, this.makeChangeParams(state));
+    }
+  }
+
+  /**
+   * @param {import("@codemirror/view").ViewUpdate} update
+   */
+  doChange({ state }) {
+    const v = getConnectionAndInitializeResult(state);
+    const params = this.makeChangeParams(state);
+    if (!params) {
+      throw new Error("Inconsistent state");
+    }
+
+    if (v?.[1]) {
+      this.didChange(v[0], params);
+    }
+  }
+
+  /**
+   * @param {import("@codemirror/state").EditorState} state
+   */
+  makeChangeParams(state) {
+    const changes = state.field(TextDocumentSynchronization.changes);
+    if (!changes.length) {
+      return null;
+    }
     /** @type {import("vscode-languageserver-protocol").TextDocumentContentChangeEvent[]} */
     const contentChanges = [];
-
-    if (this.syncOption.change === 2) {
-      update.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
-        const start = cmPositionToLsp(fromA, update.startState.doc);
-        const end = cmPositionToLsp(toA, update.startState.doc);
-        contentChanges.push({
-          range: { start, end },
-          text: inserted.toString(),
-        });
-      });
-    } else {
-      contentChanges.push({ text: update.state.doc.toString() });
+    for (const item of changes) {
+      contentChanges.push(...item.contentChanges);
     }
-
-    const params = {
-      textDocument,
+    return {
+      textDocument: changes[changes.length - 1].textDocument,
       contentChanges,
     };
-    if (this.didState === 2) {
-      this.didChange(c, params);
-    } else {
-      if (this.syncOption.change === 1) {
-        // Clear old pending changes for full sync
-        this.pendingChanges.length = 0;
-      }
-      this.pendingChanges.push(params);
-    }
   }
 
   /**
@@ -273,26 +483,23 @@ export class TextDocumentSynchronization {
    * @returns {void}
    */
   update(update) {
-    const v = getConnectionAndInitializeResult(update.state);
-    // Reset states if either is not connected or has not completed the handshake.
-    if (!v || !v[1]) {
-      return this.reset();
-    }
-
-    const [c, r] = v;
-    const t = update.state.field(textDocument);
-    this.checkReset(t, c);
-
-    if (this.didState === 5) {
-      console.debug("Halted");
-    } else if (this.didState === 4) {
-      console.debug("Closing a document:", this.didTextDocument?.uri);
-    } else if (this.didState === 0) {
-      this.doOpen(update, t, c, r);
-    } else if (update.docChanged && this.syncOption.change) {
-      this.doChange(update, t, c);
-    } else if (this.didState === 2) {
-      this.didPendingChanges(c);
+    const last = update.startState.field(TextDocumentSynchronization.state);
+    const curr = update.state.field(TextDocumentSynchronization.state);
+    if (
+      last === TextDocumentSynchronization.Closed &&
+      curr === TextDocumentSynchronization.Opening
+    ) {
+      this.doOpen(update);
+    } else if (
+      last === TextDocumentSynchronization.Open &&
+      curr === TextDocumentSynchronization.Changing
+    ) {
+      this.doChange(update);
+    } else if (
+      last === TextDocumentSynchronization.Open &&
+      curr === TextDocumentSynchronization.Closing
+    ) {
+      this.doClose(update);
     }
   }
 
@@ -302,10 +509,10 @@ export class TextDocumentSynchronization {
   }
 }
 
-export const textDocumentSynchronization = [
-  TextDocumentSynchronization.didVersion,
-  ViewPlugin.fromClass(TextDocumentSynchronization),
-];
+export const textDocumentSynchronization = ViewPlugin.fromClass(
+  TextDocumentSynchronization,
+  TextDocumentSynchronization.spec,
+);
 
 export default function () {
   return [
