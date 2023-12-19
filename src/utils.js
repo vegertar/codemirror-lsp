@@ -104,6 +104,38 @@ export function getStateIfNeedsRefresh({ state, startState }, ...args) {
 }
 
 /**
+ * @template T
+ * @overload
+ * @param {{state: import("@codemirror/state").EditorState, startState: import("@codemirror/state").EditorState}} param0
+ * @param {import("@codemirror/state").StateField<T>} param1
+ * @returns {[T, T]}
+ */
+
+/**
+ * @template T
+ * @overload
+ * @param {{state: import("@codemirror/state").EditorState, startState: import("@codemirror/state").EditorState}} param0
+ * @param {import("@codemirror/state").StateField<T>} param1
+ * @param {false} param2
+ * @returns {[(T | undefined), (T | undefined)]}
+ */
+
+/**
+ *
+ * @template T
+ * @param {{state: import("@codemirror/state").EditorState, startState: import("@codemirror/state").EditorState}} param0
+ * @param {[import("@codemirror/state").StateField<T>] | [import("@codemirror/state").StateField<T>, false]} args
+ * @returns {[(T | undefined), (T | undefined)]}
+ */
+export function getStatePairs({ state, startState }, ...args) {
+  // @ts-ignore
+  const oldValue = startState.field(...args);
+  // @ts-ignore
+  const newValue = state.field(...args);
+  return [oldValue, newValue];
+}
+
+/**
  * @typedef {import("@codemirror/state").Facet<T, U extends undefined ? never : U>} NonUndefinedFacet<T, U>
  * @template T, U
  */
@@ -122,6 +154,21 @@ export function getFacetIfNeedsRefresh({ state, startState }, facet) {
   // @ts-ignore
   const newValue = state.facet(facet);
   return oldValue !== newValue ? newValue : undefined;
+}
+
+/**
+ *
+ * @template T, U
+ * @param {{state: import("@codemirror/state").EditorState, startState: import("@codemirror/state").EditorState}} param0
+ * @param {import("@codemirror/state").Facet<T, U>} facet
+ * @returns {[U, U]}
+ */
+export function getFacetPairs({ state, startState }, facet) {
+  // @ts-ignore
+  const oldValue = startState.facet(facet);
+  // @ts-ignore
+  const newValue = state.facet(facet);
+  return [oldValue, newValue];
 }
 
 /**

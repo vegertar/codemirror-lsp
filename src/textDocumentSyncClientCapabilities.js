@@ -13,6 +13,7 @@ import {
   cmPositionToLsp,
   getLastValueFromTransaction,
   getStateIfNeedsRefresh,
+  getStatePairs,
 } from "./utils";
 
 /**
@@ -67,25 +68,56 @@ export class TextDocumentSynchronization {
   static versionEffect = StateEffect.define();
 
   /**
-   * @typedef SyncState
+   * @typedef TextDocumentSynchronizationState
    * @type {0 | 1 | 2 | 3 | 4 | 5}
    */
 
-  static Closed = /** @type {SyncState} */ (0);
-  static Opening = /** @type {SyncState} */ (1);
-  static Open = /** @type {SyncState} */ (2);
-  static Changing = /** @type {SyncState} */ (3);
-  static Closing = /** @type {SyncState} */ (4);
-  static Halt = /** @type {SyncState} */ (5);
+  /**
+   * The default state. This state is set both by default and after the RPC "textDocument/didClose" succeeds in the `CLOSING` state.
+   * It can also transition from the `HALTED` state if the document URI is available.
+   * @type {TextDocumentSynchronizationState}
+   */
+  static CLOSED = 0;
 
-  /** @type {import("@codemirror/state").StateEffectType<SyncState>} */
+  /**
+   * If the document URI is available, the `CLOSED` state transitions to the `OPENING` state.
+   * @type {TextDocumentSynchronizationState}
+   */
+  static OPENING = 1;
+
+  /**
+   * The `OPEN` state is set after the RPC "textDocument/didOpen" succeeds in the `OPENING` state
+   * or "textDocument/didChange" succeeds in the `CHANGING` state.
+   * @type {TextDocumentSynchronizationState}
+   */
+  static OPEN = 2;
+
+  /**
+   * The `CHANGING` state is transitioned if there are pending changes in the `OPEN` state.
+   * @type {TextDocumentSynchronizationState}
+   */
+  static CHANGING = 3;
+
+  /**
+   * The `CLOSING` state is transitioned if the document URI or language ID changes in the `OPEN` state.
+   * @type {TextDocumentSynchronizationState}
+   */
+  static CLOSING = 4;
+
+  /**
+   * The `HALTED` state is set if any errors occur. It can also transition from the `CLOSED` state if the document URI is unavailable.
+   * @type {TextDocumentSynchronizationState}
+   */
+  static HALTED = 5;
+
+  /** @type {import("@codemirror/state").StateEffectType<TextDocumentSynchronizationState>} */
   static stateEffect = StateEffect.define();
 
   /** @type {import("@codemirror/state").StateEffectType<TextDocument | null>} */
   static textDocumentEffect = StateEffect.define();
 
   /** @type {import("@codemirror/state").StateEffectType<DidChangeTextDocumentParams[]>} */
-  static changeEffect = StateEffect.define();
+  static changesEffect = StateEffect.define();
 
   /**
    * The state field of the version number that the text document has had synchronizations up to.
@@ -166,14 +198,14 @@ export class TextDocumentSynchronization {
   });
 
   static state = StateField.define({
-    /** @returns {SyncState} */
+    /** @returns {TextDocumentSynchronizationState} */
     create() {
-      return TextDocumentSynchronization.Closed;
+      return TextDocumentSynchronization.CLOSED;
     },
     update(value, tr) {
       if (getStateIfNeedsRefresh(tr, initializeResult) !== undefined) {
         // The connection has reset
-        return TextDocumentSynchronization.Closed;
+        return TextDocumentSynchronization.CLOSED;
       }
 
       const v = getLastValueFromTransaction(
@@ -190,25 +222,27 @@ export class TextDocumentSynchronization {
       const { uri, languageId, version } = tr.state.field(textDocument);
 
       switch (value) {
-        case TextDocumentSynchronization.Closed:
+        case TextDocumentSynchronization.CLOSED:
           if (!uri) {
-            value = TextDocumentSynchronization.Halt;
+            value = TextDocumentSynchronization.HALTED;
           } else if (option.openClose) {
-            value = TextDocumentSynchronization.Opening;
+            value = TextDocumentSynchronization.OPENING;
           }
           break;
-        case TextDocumentSynchronization.Open:
+        case TextDocumentSynchronization.OPEN:
           if (!doc || !did) {
             throw new Error("Inconsistent state");
-          } else if (doc.uri !== uri || doc.languageId !== languageId) {
-            value = TextDocumentSynchronization.Closing;
+          }
+
+          if (doc.uri !== uri || doc.languageId !== languageId) {
+            value = TextDocumentSynchronization.CLOSING;
           } else if (did < version && option.change) {
-            value = TextDocumentSynchronization.Changing;
+            value = TextDocumentSynchronization.CHANGING;
           }
           break;
-        case TextDocumentSynchronization.Halt:
+        case TextDocumentSynchronization.HALTED:
           if (uri) {
-            value = TextDocumentSynchronization.Closed;
+            value = TextDocumentSynchronization.CLOSED;
           }
           break;
       }
@@ -230,7 +264,7 @@ export class TextDocumentSynchronization {
 
       const v = getLastValueFromTransaction(
         tr,
-        TextDocumentSynchronization.changeEffect,
+        TextDocumentSynchronization.changesEffect,
       );
       if (v !== undefined) {
         return v;
@@ -239,8 +273,8 @@ export class TextDocumentSynchronization {
       const state = tr.state.field(TextDocumentSynchronization.state);
 
       if (
-        state !== TextDocumentSynchronization.Opening &&
-        state !== TextDocumentSynchronization.Changing
+        state !== TextDocumentSynchronization.OPENING &&
+        state !== TextDocumentSynchronization.CHANGING
       ) {
         // Out of responsibility
         return value;
@@ -322,20 +356,14 @@ export class TextDocumentSynchronization {
     try {
       await c.sendNotification("textDocument/didOpen", params);
     } catch (err) {
-      console.error(err);
-      // Restore to Opening state
-      return this.view.dispatch({
-        effects: TextDocumentSynchronization.stateEffect.of(
-          TextDocumentSynchronization.Opening,
-        ),
-      });
+      return this.reset(err);
     }
 
     const { uri, languageId, version } = params.textDocument;
     this.view.dispatch({
       effects: [
         TextDocumentSynchronization.stateEffect.of(
-          TextDocumentSynchronization.Open,
+          TextDocumentSynchronization.OPEN,
         ),
         TextDocumentSynchronization.textDocumentEffect.of({
           uri,
@@ -361,25 +389,10 @@ export class TextDocumentSynchronization {
         c.sendNotification("textDocument/didClose", params),
       ]);
     } catch (err) {
-      console.log(err);
-      // Restore to Open state
-      return this.view.dispatch({
-        effects: TextDocumentSynchronization.stateEffect.of(
-          TextDocumentSynchronization.Open,
-        ),
-      });
+      return this.reset(err);
     }
 
-    this.view.dispatch({
-      effects: [
-        TextDocumentSynchronization.stateEffect.of(
-          TextDocumentSynchronization.Closed,
-        ),
-        TextDocumentSynchronization.changeEffect.of([]),
-        TextDocumentSynchronization.textDocumentEffect.of(null),
-        TextDocumentSynchronization.versionEffect.of(0),
-      ],
-    });
+    this.reset();
   }
 
   /**
@@ -390,23 +403,40 @@ export class TextDocumentSynchronization {
     try {
       await c.sendNotification("textDocument/didChange", params);
     } catch (err) {
-      console.error(err);
-      // Restore to Open state
-      return this.view.dispatch({
-        effects: TextDocumentSynchronization.stateEffect.of(
-          TextDocumentSynchronization.Open,
-        ),
-      });
+      return this.reset(err);
     }
 
     this.view.dispatch({
       effects: [
         TextDocumentSynchronization.stateEffect.of(
-          TextDocumentSynchronization.Open,
+          TextDocumentSynchronization.OPEN,
         ),
         TextDocumentSynchronization.versionEffect.of(
           params.textDocument.version,
         ),
+      ],
+    });
+  }
+
+  /**
+   *
+   * @param {any} [reason]
+   */
+  reset(reason) {
+    if (reason) {
+      console.error("Reset due to", reason);
+    }
+
+    this.view.dispatch({
+      effects: [
+        TextDocumentSynchronization.stateEffect.of(
+          reason
+            ? TextDocumentSynchronization.HALTED
+            : TextDocumentSynchronization.CLOSED,
+        ),
+        TextDocumentSynchronization.changesEffect.of([]),
+        TextDocumentSynchronization.textDocumentEffect.of(null),
+        TextDocumentSynchronization.versionEffect.of(0),
       ],
     });
   }
@@ -418,14 +448,16 @@ export class TextDocumentSynchronization {
    */
   doOpen({ state }) {
     const v = getConnectionAndInitializeResult(state);
-    if (v?.[1]) {
-      this.didOpen(v[0], {
-        textDocument: {
-          ...state.field(textDocument),
-          text: state.doc.toString(),
-        },
-      });
+    if (!v?.[1]) {
+      throw new Error("Inconsistent state");
     }
+
+    this.didOpen(v[0], {
+      textDocument: {
+        ...state.field(textDocument),
+        text: state.doc.toString(),
+      },
+    });
   }
 
   /**
@@ -434,13 +466,11 @@ export class TextDocumentSynchronization {
   doClose({ state }) {
     const v = getConnectionAndInitializeResult(state);
     const doc = state.field(TextDocumentSynchronization.textDocument);
-    if (!doc) {
+    if (!v?.[1] || !doc) {
       throw new Error("Inconsistent state");
     }
 
-    if (v?.[1]) {
-      this.didClose(v[0], { textDocument: doc }, this.makeChangeParams(state));
-    }
+    this.didClose(v[0], { textDocument: doc }, this.makeChangeParams(state));
   }
 
   /**
@@ -449,13 +479,11 @@ export class TextDocumentSynchronization {
   doChange({ state }) {
     const v = getConnectionAndInitializeResult(state);
     const params = this.makeChangeParams(state);
-    if (!params) {
+    if (!v?.[1] || !params) {
       throw new Error("Inconsistent state");
     }
 
-    if (v?.[1]) {
-      this.didChange(v[0], params);
-    }
+    this.didChange(v[0], params);
   }
 
   /**
@@ -483,21 +511,24 @@ export class TextDocumentSynchronization {
    * @returns {void}
    */
   update(update) {
-    const last = update.startState.field(TextDocumentSynchronization.state);
-    const curr = update.state.field(TextDocumentSynchronization.state);
+    const [last, curr] = getStatePairs(
+      update,
+      TextDocumentSynchronization.state,
+    );
+
     if (
-      last === TextDocumentSynchronization.Closed &&
-      curr === TextDocumentSynchronization.Opening
+      last === TextDocumentSynchronization.CLOSED &&
+      curr === TextDocumentSynchronization.OPENING
     ) {
       this.doOpen(update);
     } else if (
-      last === TextDocumentSynchronization.Open &&
-      curr === TextDocumentSynchronization.Changing
+      last === TextDocumentSynchronization.OPEN &&
+      curr === TextDocumentSynchronization.CHANGING
     ) {
       this.doChange(update);
     } else if (
-      last === TextDocumentSynchronization.Open &&
-      curr === TextDocumentSynchronization.Closing
+      last === TextDocumentSynchronization.OPEN &&
+      curr === TextDocumentSynchronization.CLOSING
     ) {
       this.doClose(update);
     }
