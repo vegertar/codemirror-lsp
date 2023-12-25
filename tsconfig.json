@@ -3,6 +3,9 @@
   "exclude": ["node_modules"],
   "compilerOptions": {
     "lib": ["ESNext", "DOM"],
+    "target": "ESNext",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "outDir": "dist",
     "rootDir": "src",
     "tsBuildInfoFile": ".tsconfig.tsbuildinfo",

@@ -2,7 +2,7 @@
 
 import { Trace } from "vscode-jsonrpc";
 
-import { BeforeHandshake, initializeParams } from "./client";
+import { BeforeHandshake, initializeParams } from "./client.js";
 
 export const setTrace = BeforeHandshake.from(async (update, c) => {
   const value = update.state.facet(initializeParams).trace;

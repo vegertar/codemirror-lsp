@@ -3,10 +3,10 @@
 import { ViewPlugin } from "@codemirror/view";
 import { produce } from "immer";
 
-import { initializeParams } from "./client";
-import { getStateIfNeedsRefresh } from "./utils";
-import { textDocument } from "./textDocumentSyncClientCapabilities";
-import { providable } from "./providable";
+import { initializeParams } from "./client.js";
+import { getStateIfNeedsRefresh } from "./utils.js";
+import { textDocument } from "./textDocumentSyncClientCapabilities.js";
+import { providable } from "./providable.js";
 
 /**
  * @typedef Link

@@ -2,9 +2,15 @@
 
 import { StateField, StateEffect } from "@codemirror/state";
 
-import { getLastValueFromTransaction, getStateIfNeedsRefresh } from "./utils";
-import { getConnectionAndInitializeResult, initializeResult } from "./client";
-import { TextDocumentSynchronization } from "./textDocumentSyncClientCapabilities";
+import {
+  getLastValueFromTransaction,
+  getStateIfNeedsRefresh,
+} from "./utils.js";
+import {
+  getConnectionAndInitializeResult,
+  initializeResult,
+} from "./client.js";
+import { TextDocumentSynchronization } from "./textDocumentSyncClientCapabilities.js";
 
 /**
  * Provides capabilities mapping for the client request *method* to the server capability *property*.
@@ -246,20 +252,20 @@ export function providable(method, stateCreate, stateUpdate) {
      * @param {ProvidableResponse<T>} response
      */
     dispatch({ view }, response) {
-      view.dispatch({
-        effects: Providing.effect.of(response),
-        annotations: this.annotations(response),
-      });
+      view.dispatch(
+        { effects: Providing.effect.of(response) },
+        ...this.transactionSpecs(response),
+      );
     }
 
     /**
      *
-     * @returns {import("@codemirror/state").TransactionSpec['annotations']}
      * @param {ProvidableResponse<T>} response
+     * @returns {import("@codemirror/state").TransactionSpec[]}
      */
-    // eslint-disable-next-line no-unused-vars
-    annotations(response) {
-      return undefined;
+    transactionSpecs(response) {
+      void response;
+      return [];
     }
 
     /**

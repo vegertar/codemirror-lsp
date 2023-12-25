@@ -1,7 +1,7 @@
 // @ts-check
 
 import { Facet } from "@codemirror/state";
-import { firstAvailable } from "./utils";
+import { firstAvailable } from "./utils.js";
 
 const exampleUri = `ws://${location.host}/ls/example/plaintext`;
 

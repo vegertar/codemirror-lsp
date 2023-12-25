@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "author": "Joe Hu <vegertar@gmail.com>",
   "license": "MIT",
+  "type": "module",
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w",

@@ -2,9 +2,9 @@
 
 import { ViewPlugin } from "@codemirror/view";
 
-import { initializeParams } from "./client";
-import { providable } from "./providable";
-import { textDocument } from "./textDocumentSyncClientCapabilities";
+import { initializeParams } from "./client.js";
+import { providable } from "./providable.js";
+import { textDocument } from "./textDocumentSyncClientCapabilities.js";
 
 export class DocumentSymbolProvider extends providable(
   "textDocument/documentSymbol",

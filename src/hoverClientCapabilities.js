@@ -2,16 +2,16 @@
 
 import { ViewPlugin } from "@codemirror/view";
 
-import { initializeParams } from "./client";
-import { textDocument } from "./textDocumentSyncClientCapabilities";
+import { initializeParams } from "./client.js";
+import { textDocument } from "./textDocumentSyncClientCapabilities.js";
 import {
   cmPositionToLsp,
   getStateIfNeedsRefresh,
   logMissingField,
   mixin,
-} from "./utils";
-import { hoverable } from "./hoverable";
-import { providable } from "./providable";
+} from "./utils.js";
+import { hoverable } from "./hoverable.js";
+import { providable } from "./providable.js";
 
 export class Hover extends hoverable() {
   /**

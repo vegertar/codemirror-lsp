@@ -8,10 +8,10 @@ import {
   createWebSocketConnection,
 } from "vscode-ws-jsonrpc";
 
-import * as packageJson from "../package.json";
-import { serverUri } from "./serverUri";
-import { getLastValueFromTransaction, mergeAll } from "./utils";
-import { promisable } from "./promisable";
+import packageJson from "../package.json";
+import { serverUri } from "./serverUri.js";
+import { getLastValueFromTransaction, mergeAll } from "./utils.js";
+import { promisable } from "./promisable.js";
 
 export const { name, version } = packageJson;
 

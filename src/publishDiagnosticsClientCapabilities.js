@@ -2,8 +2,8 @@
 
 import { StateField, StateEffect } from "@codemirror/state";
 
-import { BeforeHandshake, initializeParams } from "./client";
-import { getLastValueFromTransaction } from "./utils";
+import { BeforeHandshake, initializeParams } from "./client.js";
+import { getLastValueFromTransaction } from "./utils.js";
 
 /** @type {import("@codemirror/state").StateEffectType<import("vscode-languageserver-protocol").PublishDiagnosticsParams>} */
 export const publishDiagnosticsEffect = StateEffect.define();

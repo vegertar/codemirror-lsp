@@ -100,6 +100,16 @@ export function getStateIfNeedsRefresh({ state, startState }, ...args) {
   const oldValue = startState.field(...args);
   // @ts-ignore
   const newValue = state.field(...args);
+
+  if (
+    typeof oldValue === "number" &&
+    typeof newValue === "number" &&
+    isNaN(oldValue) &&
+    isNaN(newValue)
+  ) {
+    return undefined;
+  }
+
   return oldValue !== newValue ? newValue : undefined;
 }
 

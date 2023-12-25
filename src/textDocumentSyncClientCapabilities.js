@@ -8,13 +8,13 @@ import {
   getConnectionAndInitializeResult,
   initializeParams,
   initializeResult,
-} from "./client";
+} from "./client.js";
 import {
   cmPositionToLsp,
   getLastValueFromTransaction,
   getStateIfNeedsRefresh,
   getStatePairs,
-} from "./utils";
+} from "./utils.js";
 
 /**
  * @typedef {Omit<import("vscode-languageserver-types").TextDocumentItem, "text">} TextDocument

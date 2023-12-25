@@ -2,7 +2,7 @@
 
 import { StateField } from "@codemirror/state";
 
-import { getLastValueFromTransaction } from "./utils";
+import { getLastValueFromTransaction } from "./utils.js";
 
 /**
  * @typedef {(value: T) => void} Resolve<T>
