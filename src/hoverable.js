@@ -2,22 +2,28 @@
 
 import { Annotation, StateField, StateEffect } from "@codemirror/state";
 
-import { getLastValueFromTransaction } from "./utils";
+import { getLastValueFromTransaction } from "./utils.js";
 
-export function hoverable() {
+/** @type {import("@codemirror/state").AnnotationType<MouseEvent>} */
+export const hoveringEvent = Annotation.define();
+
+/** @type {import("@codemirror/state").StateEffectType<number>} */
+export const hoveringEffect = StateEffect.define();
+
+/**
+ *
+ * @param {(pos: number, tr: import("@codemirror/state").Transaction) => boolean} [examine] Function to examine the new position. If true, update the hover state.
+ * @returns
+ */
+export function hoverable(examine) {
   return class Hovering {
-    /** @type {import("@codemirror/state").AnnotationType<MouseEvent>} */
-    static event = Annotation.define();
-
-    /** @type {import("@codemirror/state").StateEffectType<number>} */
-    static effect = StateEffect.define();
-
     static state = StateField.define({
       create() {
         return NaN;
       },
       update(value, tr) {
-        return getLastValueFromTransaction(tr, Hovering.effect) || value;
+        const v = getLastValueFromTransaction(tr, hoveringEffect);
+        return v === undefined ? value : examine?.(v, tr) !== false ? v : value;
       },
     });
 
@@ -56,6 +62,14 @@ export function hoverable() {
       this.view = view;
     }
 
+    /**
+     * Implementation of the ViewPlugin destroy.
+     * @returns {void}
+     */
+    destroy() {
+      this.cancelTimer();
+    }
+
     updateHover = () => {
       this.hoverTimeoutId = null;
       const hovered = Date.now() - this.lastMove.time;
@@ -66,8 +80,8 @@ export function hoverable() {
         );
       } else if (this.lastMove.event) {
         this.view.dispatch({
-          annotations: Hovering.event.of(this.lastMove.event),
-          effects: Hovering.effect.of(this.getPosition(this.lastMove.event)),
+          annotations: hoveringEvent.of(this.lastMove.event),
+          effects: hoveringEffect.of(this.getPosition(this.lastMove.event)),
         });
       }
     };
@@ -84,7 +98,23 @@ export function hoverable() {
      * @param {MouseEvent} event
      */
     getPosition({ clientX: x, clientY: y }) {
-      return this.view.posAtCoords({ x, y }) || NaN;
+      const pos = this.view.posAtCoords({ x, y });
+      if (pos === null) {
+        return NaN;
+      }
+
+      const coords = this.view.coordsAtPos(pos);
+      if (
+        !coords ||
+        y < coords.top ||
+        y > coords.bottom ||
+        x < coords.left - this.view.defaultCharacterWidth ||
+        x > coords.right + this.view.defaultCharacterWidth
+      ) {
+        return NaN;
+      }
+
+      return pos;
     }
   };
 }
