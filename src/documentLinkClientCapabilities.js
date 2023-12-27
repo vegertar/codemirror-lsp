@@ -13,12 +13,12 @@ import { providable } from "./providable.js";
  * @type {import("vscode-languageserver-types").DocumentLink}
  */
 
-class BaseDocumentLinkProvider extends providable(
+const BaseDocumentLinkProvider = providable(
   "textDocument/documentLink",
   (r) => r || null,
-) {}
+);
 
-class BaseDocumentLinkResolver extends providable(
+const BaseDocumentLinkResolver = providable(
   "documentLink/resolve",
   () => /** @type {Link[]} */ ([]),
   (value, tr) =>
@@ -31,12 +31,12 @@ class BaseDocumentLinkResolver extends providable(
         }
       }
     }),
-) {}
+);
 
 export class DocumentLinkProvider extends BaseDocumentLinkProvider {
   refreshAfterSynchronization = true;
 
-  /** @type {BaseDocumentLinkProvider['params']} */
+  /** @type {InstanceType<BaseDocumentLinkProvider>['params']} */
   params(update) {
     return {
       textDocument: update.state.field(textDocument),
@@ -48,12 +48,12 @@ export class DocumentLinkResolver extends BaseDocumentLinkResolver {
   /** @type {Link[] | null | undefined} */
   links;
 
-  /** @type {BaseDocumentLinkResolver['isCapable']} */
+  /** @type {InstanceType<BaseDocumentLinkResolver>['isCapable']} */
   isCapable(r, provider) {
     return !!r[provider]?.resolveProvider;
   }
 
-  /** @type {BaseDocumentLinkResolver['needsRefresh']} */
+  /** @type {InstanceType<BaseDocumentLinkResolver>['needsRefresh']} */
   needsRefresh(update) {
     const links = getStateIfNeedsRefresh(
       update,
@@ -63,7 +63,7 @@ export class DocumentLinkResolver extends BaseDocumentLinkResolver {
     return !!links;
   }
 
-  /** @type {BaseDocumentLinkResolver['refresh']} */
+  /** @type {InstanceType<BaseDocumentLinkResolver>['refresh']} */
   refresh(update, c) {
     this.links?.forEach((link) => {
       if (!link.target) {

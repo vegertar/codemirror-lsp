@@ -100,16 +100,6 @@ export function getStateIfNeedsRefresh({ state, startState }, ...args) {
   const oldValue = startState.field(...args);
   // @ts-ignore
   const newValue = state.field(...args);
-
-  if (
-    typeof oldValue === "number" &&
-    typeof newValue === "number" &&
-    isNaN(oldValue) &&
-    isNaN(newValue)
-  ) {
-    return undefined;
-  }
-
   return oldValue !== newValue ? newValue : undefined;
 }
 
@@ -182,15 +172,6 @@ export function getFacetPairs({ state, startState }, facet) {
 }
 
 /**
- *
- * @param {string} name
- * @param {string} [hint]
- */
-export function logMissingField(name, hint) {
-  console.warn("The extension %s is missing:", name, hint);
-}
-
-/**
  * @typedef {Omit<A, keyof B>} Diff<A, B>
  * @template A, B
  */
@@ -224,4 +205,25 @@ export function mixin(t, v) {
   Object.assign(t.prototype, v);
   // @ts-ignore
   return t;
+}
+
+/**
+ * Convert given text position from LSP to the CodeMirror Position.
+ * @param {import("vscode-languageserver-types").Position} pos
+ * @param {import("@codemirror/state").Text} text
+ * @returns {number}
+ */
+export function lspPositionToCm(pos, text) {
+  const line = text.line(pos.line + 1);
+  return line.from + pos.character;
+}
+
+/**
+ * Convert given text position from LSP to the CodeMirror Position.
+ * @param {import("vscode-languageserver-types").Range} range
+ * @param {import("@codemirror/state").Text} text
+ * @returns {[number, number]}
+ */
+export function lspRangeToCm(range, text) {
+  return [lspPositionToCm(range.start, text), lspPositionToCm(range.end, text)];
 }

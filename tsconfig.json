@@ -4,8 +4,8 @@
   "compilerOptions": {
     "lib": ["ESNext", "DOM"],
     "target": "ESNext",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "Node",
     "outDir": "dist",
     "rootDir": "src",
     "tsBuildInfoFile": ".tsconfig.tsbuildinfo",

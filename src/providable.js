@@ -1,6 +1,7 @@
 // @ts-check
 
-import { StateField, StateEffect } from "@codemirror/state";
+import { StateField, StateEffect, Annotation } from "@codemirror/state";
+import { produce } from "immer";
 
 import {
   getLastValueFromTransaction,
@@ -164,6 +165,9 @@ export function providable(method, stateCreate, stateUpdate) {
     /** @type {import("@codemirror/state").StateEffectType<ProvidableResponse<T>>} */
     static effect = StateEffect.define();
 
+    /** @type {import("@codemirror/state").AnnotationType<Providing>} */
+    static event = Annotation.define();
+
     /** @type {import("@codemirror/state").StateField<U>} */
     static state = StateField.define({
       create(state) {
@@ -174,9 +178,12 @@ export function providable(method, stateCreate, stateUpdate) {
           return stateUpdate(value, tr);
         }
         const response = getLastValueFromTransaction(tr, Providing.effect);
-        return response !== undefined
-          ? stateCreate.call(tr.state, response)
-          : value;
+        if (response === undefined) {
+          return value;
+        }
+        return produce(stateCreate.call(tr.state, response), (draft) => {
+          tr.annotation(Providing.event)?.revise(value, tr, draft);
+        });
       },
     });
 
@@ -252,29 +259,30 @@ export function providable(method, stateCreate, stateUpdate) {
      * @param {ProvidableResponse<T>} response
      */
     dispatch({ view }, response) {
-      view.dispatch(
-        { effects: Providing.effect.of(response) },
-        ...this.transactionSpecs(response),
-      );
+      view.dispatch({
+        annotations: Providing.event.of(this),
+        effects: Providing.effect.of(response),
+      });
     }
 
     /**
      *
-     * @param {ProvidableResponse<T>} response
-     * @returns {import("@codemirror/state").TransactionSpec[]}
-     */
-    transactionSpecs(response) {
-      void response;
-      return [];
-    }
-
-    /**
-     *
+     * @param {import("@codemirror/view").ViewUpdate} update
      * @param {ProvidableResponse<T>} response
      * @returns {ProvidableResponse<T>}
      */
-    touch(response) {
+    touch(update, response) {
       return response;
+    }
+
+    /**
+     *
+     * @param {U} value
+     * @param {import("@codemirror/state").Transaction} tr
+     * @param {import("immer").Draft<U>} draft
+     */
+    revise(value, tr, draft) {
+      void draft;
     }
 
     /**
@@ -286,7 +294,7 @@ export function providable(method, stateCreate, stateUpdate) {
     // eslint-disable-next-line no-unused-vars
     refresh(update, c, r) {
       this.sendRequest(c, this.params(update))
-        .then((result) => this.dispatch(update, this.touch(result)))
+        .then((result) => this.dispatch(update, this.touch(update, result)))
         .catch(console.error);
     }
 

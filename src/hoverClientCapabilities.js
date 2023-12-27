@@ -7,28 +7,13 @@ import { textDocument } from "./textDocumentSyncClientCapabilities.js";
 import {
   cmPositionToLsp,
   getStateIfNeedsRefresh,
-  logMissingField,
+  lspRangeToCm,
   mixin,
 } from "./utils.js";
 import { hoverable } from "./hoverable.js";
 import { providable } from "./providable.js";
 
-export class Hover extends hoverable() {
-  /**
-   *
-   * @param {import("@codemirror/state").EditorState} state
-   * @param {string} [hint]
-   */
-  static value(state, hint) {
-    const pos = state.field(Hover.state, false);
-    if (pos === undefined) {
-      logMissingField("Hover.state", hint);
-    } else if (isNaN(pos)) {
-      return null;
-    }
-    return pos;
-  }
-}
+export class Hover extends hoverable() {}
 
 //
 // If there's a failure to mixin the *hoverProviderMixin*, it's helpful to use the following snippet
@@ -82,31 +67,46 @@ export const hoverProviderMixin = {
    */
   needsRefresh(update) {
     const pos = getStateIfNeedsRefresh(update, Hover.state, false);
-    if (pos === undefined || isNaN(pos)) {
+    if (pos == null) {
       return false;
     }
 
     this.pos = pos;
     return true;
   },
-
-  /**
-   * Relate the current hover position to the response.
-   * @param {any} response
-   * @returns {any} The modified response with the hover position tied.
-   */
-  touch(response) {
-    if (response) {
-      response.pos = this.pos;
-    }
-    return response;
-  },
 };
 
-export class HoverProvider extends mixin(
-  providable("textDocument/hover", (r) => r || null),
+const BaseHoverProvider = mixin(
+  providable(
+    "textDocument/hover",
+    /**
+     * @param {import("./providable.js").HoverResponse | undefined} r
+     * @returns {{
+     *   datum: import("./providable.js").HoverResponse,
+     *   pos: number,
+     *   from: number,
+     *   to: number,
+     * }}
+     */
+    (r) => ({ datum: r || null, pos: NaN, from: NaN, to: NaN }),
+  ),
   hoverProviderMixin,
-) {}
+);
+
+export class HoverProvider extends BaseHoverProvider {
+  /** @type {InstanceType<BaseHoverProvider>['revise']} */
+  revise = (value, { changes, docChanged, state }, draft) => {
+    draft.from = draft.to = draft.pos = this.pos;
+    if (draft.datum?.range) {
+      [draft.from, draft.to] = lspRangeToCm(draft.datum.range, state.doc);
+    }
+    if (docChanged) {
+      draft.pos = changes.mapPos(draft.pos);
+      draft.from = changes.mapPos(draft.from, 1);
+      draft.to = changes.mapPos(draft.to, -1);
+    }
+  };
+}
 
 export const hover = ViewPlugin.fromClass(Hover, Hover.spec);
 

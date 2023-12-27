@@ -4,26 +4,25 @@ import { Annotation, StateField, StateEffect } from "@codemirror/state";
 
 import { getLastValueFromTransaction } from "./utils.js";
 
-/** @type {import("@codemirror/state").AnnotationType<MouseEvent>} */
-export const hoveringEvent = Annotation.define();
-
-/** @type {import("@codemirror/state").StateEffectType<number>} */
-export const hoveringEffect = StateEffect.define();
-
-/**
- *
- * @param {(pos: number, tr: import("@codemirror/state").Transaction) => boolean} [examine] Function to examine the new position. If true, update the hover state.
- * @returns
- */
-export function hoverable(examine) {
+export function hoverable() {
   return class Hovering {
+    /** @type {import("@codemirror/state").AnnotationType<MouseEvent>} */
+    static event = Annotation.define();
+
+    /** @type {import("@codemirror/state").StateEffectType<number | null>} */
+    static effect = StateEffect.define();
+
     static state = StateField.define({
+      /** @returns {null | number} */
       create() {
-        return NaN;
+        return null;
       },
       update(value, tr) {
-        const v = getLastValueFromTransaction(tr, hoveringEffect);
-        return v === undefined ? value : examine?.(v, tr) !== false ? v : value;
+        if (value !== null && tr.docChanged) {
+          value = tr.changes.mapPos(value);
+        }
+        const v = getLastValueFromTransaction(tr, Hovering.effect);
+        return v === undefined ? value : v;
       },
     });
 
@@ -80,8 +79,8 @@ export function hoverable(examine) {
         );
       } else if (this.lastMove.event) {
         this.view.dispatch({
-          annotations: hoveringEvent.of(this.lastMove.event),
-          effects: hoveringEffect.of(this.getPosition(this.lastMove.event)),
+          annotations: Hovering.event.of(this.lastMove.event),
+          effects: Hovering.effect.of(this.getPosition(this.lastMove.event)),
         });
       }
     };
@@ -99,19 +98,17 @@ export function hoverable(examine) {
      */
     getPosition({ clientX: x, clientY: y }) {
       const pos = this.view.posAtCoords({ x, y });
-      if (pos === null) {
-        return NaN;
-      }
-
-      const coords = this.view.coordsAtPos(pos);
-      if (
-        !coords ||
-        y < coords.top ||
-        y > coords.bottom ||
-        x < coords.left - this.view.defaultCharacterWidth ||
-        x > coords.right + this.view.defaultCharacterWidth
-      ) {
-        return NaN;
+      if (pos !== null) {
+        const coords = this.view.coordsAtPos(pos);
+        if (
+          !coords ||
+          y < coords.top ||
+          y > coords.bottom ||
+          x < coords.left - this.view.defaultCharacterWidth ||
+          x > coords.right + this.view.defaultCharacterWidth
+        ) {
+          return null;
+        }
       }
 
       return pos;
